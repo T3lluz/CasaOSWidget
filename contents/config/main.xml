@@ -3,6 +3,7 @@
       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
   <kcfgfile name=""/>
+
   <group name="General">
     <entry name="serverUrl" type="String">
       <label>CasaOS server URL</label>
@@ -26,9 +27,81 @@
       <min>2</min>
       <max>120</max>
     </entry>
-    <entry name="compactDisplay" type="Int">
-      <label>Panel display mode</label>
+    <entry name="requestTimeoutMs" type="Int">
+      <label>HTTP request timeout (ms)</label>
+      <default>6000</default>
+      <min>1000</min>
+      <max>30000</max>
+    </entry>
+  </group>
+
+  <group name="Appearance">
+    <!-- 0 = icons + values, 1 = values only, 2 = icons only -->
+    <entry name="displayMode" type="Int">
+      <label>Panel display style</label>
       <default>0</default>
+      <min>0</min>
+      <max>2</max>
+    </entry>
+    <entry name="showCpu" type="Bool">
+      <label>Show CPU</label>
+      <default>true</default>
+    </entry>
+    <entry name="showCpuTemp" type="Bool">
+      <label>Show CPU temperature in panel</label>
+      <default>false</default>
+    </entry>
+    <entry name="showRam" type="Bool">
+      <label>Show RAM</label>
+      <default>true</default>
+    </entry>
+    <entry name="showDisk" type="Bool">
+      <label>Show disk (compact, no unit suffix)</label>
+      <default>false</default>
+    </entry>
+    <entry name="showNetwork" type="Bool">
+      <label>Show network rates</label>
+      <default>true</default>
+    </entry>
+    <entry name="showStatusDot" type="Bool">
+      <label>Show connection dot</label>
+      <default>true</default>
+    </entry>
+    <entry name="showMiniBars" type="Bool">
+      <label>Show inline progress bars</label>
+      <default>false</default>
+    </entry>
+    <!-- Celsius / Fahrenheit -->
+    <entry name="tempUnit" type="String">
+      <label>Temperature unit</label>
+      <default>C</default>
+    </entry>
+    <!-- auto, mbps, mbytes, kbytes -->
+    <entry name="netUnit" type="String">
+      <label>Network unit</label>
+      <default>mbps</default>
+    </entry>
+    <entry name="historyLength" type="Int">
+      <label>Sparkline history samples</label>
+      <default>60</default>
+      <min>15</min>
+      <max>600</max>
+    </entry>
+  </group>
+
+  <group name="Behavior">
+    <!-- refresh, dashboard, reboot, none -->
+    <entry name="middleClickAction" type="String">
+      <label>Middle click action</label>
+      <default>refresh</default>
+    </entry>
+    <entry name="skipRebootConfirm" type="Bool">
+      <label>Skip reboot confirmation dialog</label>
+      <default>false</default>
+    </entry>
+    <entry name="browserCommand" type="String">
+      <label>Command used to open dashboard URL</label>
+      <default>xdg-open</default>
     </entry>
   </group>
 </kcfg>

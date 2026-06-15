@@ -8,12 +8,12 @@
             }
         ],
         "Category": "System Information",
-        "Description": "Monitor your CasaOS homelab server CPU, RAM, disk, temperature, and network from the KDE panel.",
+        "Description": "Monitor your CasaOS homelab server CPU, RAM, disk, temperature, network and services from the KDE panel — with a rich popup, history graphs and one-click reboot.",
         "Icon": "computer",
         "Id": "org.fredde.casaos.homelab",
         "License": "MIT",
         "Name": "CasaOS Homelab",
-        "Version": "1.1.0",
+        "Version": "2.0.0",
         "Website": "https://github.com/T3lluz/CasaOSWidget"
     },
     "X-Plasma-API-Minimum-Version": "6.0"
