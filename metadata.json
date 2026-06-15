@@ -1,0 +1,20 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "fredde",
+                "Email": "fstalsberg@gmail.com"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Monitor your CasaOS homelab server CPU, RAM, disk, temperature, and network from the KDE panel.",
+        "Icon": "computer",
+        "Id": "org.fredde.casaos.homelab",
+        "License": "MIT",
+        "Name": "CasaOS Homelab",
+        "Version": "1.1.0",
+        "Website": "https://github.com/T3lluz/CasaOSWidget"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
