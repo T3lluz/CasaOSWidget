@@ -71,6 +71,10 @@
       <label>Show inline progress bars</label>
       <default>false</default>
     </entry>
+    <entry name="showSeparators" type="Bool">
+      <label>Show dot separators between panel metrics</label>
+      <default>false</default>
+    </entry>
     <!-- Celsius / Fahrenheit -->
     <entry name="tempUnit" type="String">
       <label>Temperature unit</label>

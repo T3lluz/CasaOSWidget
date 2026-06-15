@@ -24,6 +24,7 @@ KCM.SimpleKCM {
     property alias cfg_showNetwork: netCheck.checked
     property alias cfg_showStatusDot: statusCheck.checked
     property alias cfg_showMiniBars: barsCheck.checked
+    property alias cfg_showSeparators: separatorsCheck.checked
     property string cfg_tempUnit
     property string cfg_netUnit
     property alias cfg_historyLength: historySpin.value
@@ -142,6 +143,10 @@ KCM.SimpleKCM {
         QQC2.CheckBox {
             id: barsCheck
             text: i18n("Inline progress bars next to values")
+        }
+        QQC2.CheckBox {
+            id: separatorsCheck
+            text: i18n("Dot separators between metrics")
         }
 
         // ============ Units ========================================

@@ -20,10 +20,12 @@ PlasmoidItem {
 
     toolTipMainText: Plasmoid.configuration.serverName || i18n("CasaOS Homelab")
     toolTipSubText: api.isConnected
-        ? i18n("CPU %1% · RAM %2% · Disk %3",
+        ? i18n("CPU %1%  ·  RAM %2%  ·  Disk %3\n↓ %4   ↑ %5\nClick to expand",
                Math.round(api.cpuPercent),
                Math.round(api.memPercent),
-               api.diskPairText())
+               api.diskPairText(),
+               api.formatRate(api.netRxRate),
+               api.formatRate(api.netTxRate))
         : api.statusMessage || i18n("Disconnected")
 
     // Always keep the panel widget in its compact, single-line form.

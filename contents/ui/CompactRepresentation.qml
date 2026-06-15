@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
-import org.kde.plasma.components as PC3
 import org.kde.kirigami as Kirigami
 
 // Single-line panel widget.
@@ -33,6 +32,16 @@ Item {
     readonly property bool showIcons:  displayMode !== 1
     readonly property bool showValues: displayMode !== 2
 
+    // ---- separator visibility ------------------------------------------
+    // A dot separator is drawn before a metric when separators are enabled,
+    // that metric is visible, and at least one metric precedes it.
+    readonly property bool sepsOn: Plasmoid.configuration.showSeparators
+    readonly property bool vCpu:  Plasmoid.configuration.showCpu
+    readonly property bool vTemp: Plasmoid.configuration.showCpuTemp && root.api.cpuTemp > 0
+    readonly property bool vRam:  Plasmoid.configuration.showRam
+    readonly property bool vDisk: Plasmoid.configuration.showDisk
+    readonly property bool vNet:  Plasmoid.configuration.showNetwork
+
     implicitWidth: isVertical
         ? Math.max(Kirigami.Units.gridUnit * 2.5, verticalCol.implicitWidth + Kirigami.Units.smallSpacing * 2)
         : horizontalRow.implicitWidth + Kirigami.Units.smallSpacing * 2
@@ -46,10 +55,6 @@ Item {
     Layout.preferredHeight: implicitHeight
 
     // ---- click handling --------------------------------------------
-    function toggleExpanded() {
-        root.plasmoidItem.expanded = !root.plasmoidItem.expanded
-    }
-
     function runMiddleAction() {
         switch (Plasmoid.configuration.middleClickAction) {
         case "dashboard":
@@ -103,6 +108,8 @@ Item {
             showValue: root.showValues
         }
 
+        Sep { show: root.sepsOn && root.vTemp && root.vCpu }
+
         Metric {
             visible: Plasmoid.configuration.showCpuTemp && root.api.cpuTemp > 0
             theme: root.theme
@@ -112,6 +119,8 @@ Item {
             showIcon: false
             showValue: root.showValues
         }
+
+        Sep { show: root.sepsOn && root.vRam && (root.vCpu || root.vTemp) }
 
         Metric {
             visible: Plasmoid.configuration.showRam
@@ -124,6 +133,8 @@ Item {
             showValue: root.showValues
         }
 
+        Sep { show: root.sepsOn && root.vDisk && (root.vCpu || root.vTemp || root.vRam) }
+
         Metric {
             visible: Plasmoid.configuration.showDisk
             theme: root.theme
@@ -135,6 +146,8 @@ Item {
             showValue: root.showValues
         }
 
+        Sep { show: root.sepsOn && root.vNet && (root.vCpu || root.vTemp || root.vRam || root.vDisk) }
+
         Metric {
             visible: Plasmoid.configuration.showNetwork
             theme: root.theme
@@ -144,6 +157,8 @@ Item {
             showIcon: root.showIcons
             showValue: root.showValues
         }
+
+        Sep { show: root.sepsOn && root.vNet }
 
         Metric {
             visible: Plasmoid.configuration.showNetwork
@@ -176,30 +191,35 @@ Item {
             valueText: root.api.cpuPercent >= 0 ? Math.round(root.api.cpuPercent) + "%" : "—"
             showIcon: root.showIcons; showValue: root.showValues
         }
+        Sep { vertical: true; show: root.sepsOn && root.vTemp && root.vCpu }
         VMetric {
             visible: Plasmoid.configuration.showCpuTemp && root.api.cpuTemp > 0
             theme: root.theme; kind: "cpu"; accent: root.theme.warning
             valueText: root.api.formatTemp(root.api.cpuTemp)
             showIcon: false; showValue: root.showValues
         }
+        Sep { vertical: true; show: root.sepsOn && root.vRam && (root.vCpu || root.vTemp) }
         VMetric {
             visible: Plasmoid.configuration.showRam
             theme: root.theme; kind: "ram"; accent: root.theme.ram
             valueText: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
             showIcon: root.showIcons; showValue: root.showValues
         }
+        Sep { vertical: true; show: root.sepsOn && root.vDisk && (root.vCpu || root.vTemp || root.vRam) }
         VMetric {
             visible: Plasmoid.configuration.showDisk
             theme: root.theme; kind: "disk"; accent: root.theme.disk
             valueText: root.api.diskPairCompact()
             showIcon: root.showIcons; showValue: root.showValues
         }
+        Sep { vertical: true; show: root.sepsOn && root.vNet && (root.vCpu || root.vTemp || root.vRam || root.vDisk) }
         VMetric {
             visible: Plasmoid.configuration.showNetwork
             theme: root.theme; kind: "down"; accent: root.theme.netRx
             valueText: root.api.formatRate(root.api.netRxRate)
             showIcon: root.showIcons; showValue: root.showValues
         }
+        Sep { vertical: true; show: root.sepsOn && root.vNet }
         VMetric {
             visible: Plasmoid.configuration.showNetwork
             theme: root.theme; kind: "up"; accent: root.theme.netTx
@@ -213,52 +233,47 @@ Item {
     // swallow the press. Sampled-on-press avoids the popup-dismiss race
     // (Plasma closes the popup on the press that precedes our click,
     // so we toggle from the *pressed* state, not the current one).
+    //
+    // hoverEnabled is intentionally OFF: the hover tooltip is provided
+    // natively by Plasma via toolTipMainText/SubText in main.qml. Driving
+    // a PC3.ToolTip from containsMouse here made the tooltip appear under
+    // the cursor and loop show/hide, which is what flickered the cursor
+    // (see KDE plasma-workspace MR !4641). cursorShape still applies on
+    // hover without hoverEnabled.
     MouseArea {
         id: clickLayer
         anchors.fill: parent
         z: 1000
-        hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+        hoverEnabled: false
+        // Right button is declined (mouse.accepted = false) so the applet
+        // context menu still opens normally via the containment.
+        acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
 
         property bool wasExpanded: false
 
         onPressed: function(mouse) {
+            if (mouse.button === Qt.RightButton) {
+                mouse.accepted = false
+                return
+            }
             wasExpanded = root.plasmoidItem.expanded
         }
         onClicked: function(mouse) {
+            if (mouse.button === Qt.RightButton) {
+                mouse.accepted = false
+                return
+            }
             if (mouse.button === Qt.MiddleButton) {
                 root.runMiddleAction()
                 return
             }
             root.plasmoidItem.expanded = !wasExpanded
         }
-
-        // TapHandler fallback — TapHandler uses Qt's pointer event API
-        // which propagates through QML items the legacy MouseArea filter
-        // sometimes misses (see KDE bug 518024 for the Kirigami.Icon
-        // event-absorption variant of this problem).
-        TapHandler {
-            acceptedButtons: Qt.LeftButton
-            onTapped: root.toggleExpanded()
-        }
-
-        PC3.ToolTip.visible: containsMouse && !root.plasmoidItem.expanded
-        PC3.ToolTip.delay: 600
-        PC3.ToolTip.text: {
-            if (!root.api.isConfigured) return i18n("Click to configure CasaOS Homelab")
-            if (root.api.isConnected) {
-                return i18n("%1 · CasaOS %2\nCPU %3%   RAM %4%   Disk %5\n↓ %6   ↑ %7\nClick to expand · middle-click to %8",
-                    Plasmoid.configuration.serverName || i18n("Homelab"),
-                    root.api.casaVersion || "?",
-                    Math.round(root.api.cpuPercent),
-                    Math.round(root.api.memPercent),
-                    root.api.diskPairText(),
-                    root.api.formatRate(root.api.netRxRate),
-                    root.api.formatRate(root.api.netTxRate),
-                    root.midActionLabel())
+        onReleased: function(mouse) {
+            if (mouse.button === Qt.RightButton) {
+                mouse.accepted = false
             }
-            return root.api.statusMessage || i18n("Disconnected")
         }
     }
 
@@ -269,6 +284,18 @@ Item {
         case "none":      return i18n("(nothing)")
         default:          return i18n("refresh")
         }
+    }
+
+    // ---- dot separator between metrics ---------------------------------
+    component Sep: Rectangle {
+        property bool show: false
+        property bool vertical: false
+        visible: show
+        implicitWidth: 3
+        implicitHeight: 3
+        radius: 1.5
+        color: root.theme.textMuted
+        Layout.alignment: vertical ? Qt.AlignHCenter : Qt.AlignVCenter
     }
 
     // ---- shared metric chip (horizontal) -------------------------------

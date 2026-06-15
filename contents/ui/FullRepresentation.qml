@@ -20,12 +20,20 @@ PlasmaExtras.Representation {
 
     collapseMarginsHint: true
 
-    readonly property int popupWidth: Kirigami.Units.gridUnit * 26
+    // Shared edge inset for every card so the popup uses its width well.
+    readonly property int edgeMargin: Kirigami.Units.smallSpacing * 1.5
+    // One height for every sparkline so all graphs match.
+    readonly property int graphHeight: Kirigami.Units.gridUnit * 4
+    readonly property int popupWidth: Kirigami.Units.gridUnit * 24
+    readonly property int popupContentHeight: body.implicitHeight
     Layout.preferredWidth: popupWidth
-    Layout.minimumWidth: Kirigami.Units.gridUnit * 22
+    Layout.minimumWidth: Kirigami.Units.gridUnit * 20
     Layout.maximumWidth: Kirigami.Units.gridUnit * 32
-    Layout.preferredHeight: body.implicitHeight + Kirigami.Units.largeSpacing * 2
-    Layout.minimumHeight: body.implicitHeight + Kirigami.Units.largeSpacing * 2
+    Layout.preferredHeight: popupContentHeight
+    Layout.minimumHeight: popupContentHeight
+    Layout.maximumHeight: popupContentHeight
+    implicitHeight: popupContentHeight
+    implicitWidth: popupWidth
 
     // --- background ------------------------------------------------------
     Rectangle {
@@ -120,7 +128,7 @@ PlasmaExtras.Representation {
         property string title: ""
 
         Layout.fillWidth: true
-        implicitHeight: cardLayout.implicitHeight + Kirigami.Units.largeSpacing * 1.5
+        implicitHeight: cardLayout.implicitHeight + Kirigami.Units.smallSpacing * 2
         radius: root.theme.radiusMd
         color: root.theme.bgElevated
         border.width: 1
@@ -129,7 +137,7 @@ PlasmaExtras.Representation {
         ColumnLayout {
             id: cardLayout
             anchors.fill: parent
-            anchors.margins: Kirigami.Units.largeSpacing
+            anchors.margins: Kirigami.Units.smallSpacing * 1.5
             spacing: Kirigami.Units.smallSpacing
 
             Text {
@@ -147,50 +155,6 @@ PlasmaExtras.Representation {
                 id: inner
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
-            }
-        }
-    }
-
-    component MetricBar: ColumnLayout {
-        id: mb
-        required property string label
-        required property real percent
-        required property string detail
-        property color barColor: root.theme.severityColor(mb.percent)
-
-        spacing: 4
-        Layout.fillWidth: true
-
-        RowLayout {
-            Layout.fillWidth: true
-            Text {
-                text: mb.label
-                color: root.theme.text
-                font.weight: Font.DemiBold
-                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                Layout.fillWidth: true
-                renderType: Text.NativeRendering
-            }
-            Text {
-                text: mb.detail
-                color: root.theme.textDim
-                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                renderType: Text.NativeRendering
-            }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 6
-            radius: 3
-            color: root.theme.trackBg
-
-            Rectangle {
-                width: parent.width * Math.max(0, Math.min(1, mb.percent / 100))
-                height: parent.height
-                radius: parent.radius
-                color: mb.barColor
-                Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
             }
         }
     }
@@ -220,6 +184,64 @@ PlasmaExtras.Representation {
             horizontalAlignment: Text.AlignRight
             Layout.maximumWidth: root.popupWidth * 0.6
             renderType: Text.NativeRendering
+        }
+    }
+
+    // A labelled sparkline sitting on its own inset background, so adjacent
+    // graphs read as clearly separate panels.
+    component LabeledGraph: ColumnLayout {
+        id: lg
+        property string label: ""
+        property color accent: root.theme.text
+        property string valueText: ""
+        property alias samples: lgSpark.samples
+        property bool autoScale: false
+        property real chartHeight: root.graphHeight
+
+        Layout.fillWidth: true
+        // Equal preferred width so paired graphs always split the row evenly,
+        // regardless of how wide their label/value text is.
+        Layout.preferredWidth: 1
+        spacing: Kirigami.Units.smallSpacing
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            Text {
+                text: lg.label
+                color: lg.accent
+                font.weight: Font.DemiBold
+                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                renderType: Text.NativeRendering
+            }
+            Item { Layout.fillWidth: true }
+            Text {
+                text: lg.valueText
+                color: root.theme.text
+                font.weight: Font.Bold
+                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                renderType: Text.NativeRendering
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: lg.chartHeight
+            radius: root.theme.radiusSm
+            color: root.theme.bg
+            border.width: 1
+            border.color: root.theme.divider
+            clip: true
+
+            SparklineChart {
+                id: lgSpark
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.smallSpacing
+                lineColor: lg.accent
+                gridColor: root.theme.divider
+                baselineColor: root.theme.trackBg
+                autoScale: lg.autoScale
+            }
         }
     }
 
@@ -269,15 +291,15 @@ PlasmaExtras.Representation {
         ColumnLayout {
             id: body
             width: parent.width
-            spacing: Kirigami.Units.largeSpacing
+            spacing: Kirigami.Units.smallSpacing
 
             // ---- header ---------------------------------------------
             Rectangle {
                 Layout.fillWidth: true
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                Layout.rightMargin: Kirigami.Units.largeSpacing
-                Layout.topMargin: Kirigami.Units.largeSpacing
-                implicitHeight: headerRow.implicitHeight + Kirigami.Units.largeSpacing * 1.5
+                Layout.leftMargin: root.edgeMargin
+                Layout.rightMargin: root.edgeMargin
+                Layout.topMargin: root.edgeMargin
+                implicitHeight: headerRow.implicitHeight + Kirigami.Units.smallSpacing * 2
                 radius: root.theme.radiusMd
                 color: root.theme.bgElevated
                 border.width: 1
@@ -286,7 +308,7 @@ PlasmaExtras.Representation {
                 RowLayout {
                     id: headerRow
                     anchors.fill: parent
-                    anchors.margins: Kirigami.Units.largeSpacing
+                    anchors.margins: Kirigami.Units.smallSpacing * 1.5
                     spacing: Kirigami.Units.smallSpacing * 1.5
 
                     // server avatar with status ring
@@ -380,8 +402,8 @@ PlasmaExtras.Representation {
             // ---- gauges row -------------------------------------------
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                Layout.rightMargin: Kirigami.Units.largeSpacing
+                Layout.leftMargin: root.edgeMargin
+                Layout.rightMargin: root.edgeMargin
                 spacing: Kirigami.Units.smallSpacing
 
                 GaugeRing {
@@ -424,178 +446,55 @@ PlasmaExtras.Representation {
 
             // ---- history graphs --------------------------------------
             SectionCard {
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                Layout.rightMargin: Kirigami.Units.largeSpacing
+                Layout.leftMargin: root.edgeMargin
+                Layout.rightMargin: root.edgeMargin
                 title: i18n("History")
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: Kirigami.Units.largeSpacing
+                    spacing: Kirigami.Units.smallSpacing * 2
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text {
-                                text: i18n("CPU")
-                                color: root.theme.cpu
-                                font.weight: Font.DemiBold
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                renderType: Text.NativeRendering
-                            }
-                            Item { Layout.fillWidth: true }
-                            Text {
-                                text: root.api.cpuPercent >= 0 ? Math.round(root.api.cpuPercent) + "%" : "—"
-                                color: root.theme.text
-                                font.weight: Font.Bold
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                renderType: Text.NativeRendering
-                            }
-                        }
-                        SparklineChart {
-                            samples: root.api.cpuHistory
-                            lineColor: root.theme.cpu
-                            gridColor: root.theme.divider
-                            baselineColor: root.theme.trackBg
-                        }
+                    LabeledGraph {
+                        label: i18n("CPU")
+                        accent: root.theme.cpu
+                        valueText: root.api.cpuPercent >= 0 ? Math.round(root.api.cpuPercent) + "%" : "—"
+                        samples: root.api.cpuHistory
                     }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text {
-                                text: i18n("RAM")
-                                color: root.theme.ram
-                                font.weight: Font.DemiBold
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                renderType: Text.NativeRendering
-                            }
-                            Item { Layout.fillWidth: true }
-                            Text {
-                                text: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
-                                color: root.theme.text
-                                font.weight: Font.Bold
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                renderType: Text.NativeRendering
-                            }
-                        }
-                        SparklineChart {
-                            samples: root.api.memHistory
-                            lineColor: root.theme.ram
-                            gridColor: root.theme.divider
-                            baselineColor: root.theme.trackBg
-                        }
+                    LabeledGraph {
+                        label: i18n("RAM")
+                        accent: root.theme.ram
+                        valueText: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
+                        samples: root.api.memHistory
                     }
-                }
-            }
-
-            // ---- resources detail ------------------------------------
-            SectionCard {
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                Layout.rightMargin: Kirigami.Units.largeSpacing
-                title: i18n("Resources")
-
-                MetricBar {
-                    label: i18n("CPU load")
-                    percent: root.api.cpuPercent
-                    detail: (root.api.cpuCores > 0 ? i18n("%1 cores", root.api.cpuCores) : "")
-                        + (root.api.cpuTemp > 0 ? " · " + root.api.formatTemp(root.api.cpuTemp) : "")
-                    barColor: root.theme.cpu
-                }
-                MetricBar {
-                    label: i18n("Memory")
-                    percent: root.api.memPercent
-                    detail: root.api.memTotal > 0
-                        ? root.api.formatBytes(root.api.memUsed) + " / " + root.api.formatBytes(root.api.memTotal)
-                        : "—"
-                    barColor: root.theme.ram
-                }
-                MetricBar {
-                    label: i18n("Storage")
-                    percent: root.api.diskPercent
-                    detail: root.api.diskPairLongText()
-                    barColor: root.api.diskHealthy ? root.theme.disk : root.theme.danger
                 }
             }
 
             // ---- network ---------------------------------------------
             SectionCard {
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                Layout.rightMargin: Kirigami.Units.largeSpacing
+                Layout.leftMargin: root.edgeMargin
+                Layout.rightMargin: root.edgeMargin
                 visible: root.api.networkInterfaces.length > 0
                 title: i18n("Network")
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: Kirigami.Units.largeSpacing
+                    spacing: Kirigami.Units.smallSpacing * 2
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text {
-                                text: "↓  " + i18n("Down")
-                                color: root.theme.netRx
-                                font.weight: Font.DemiBold
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                renderType: Text.NativeRendering
-                            }
-                            Item { Layout.fillWidth: true }
-                            Text {
-                                text: root.api.formatRate(root.api.netRxRate)
-                                color: root.theme.text
-                                font.weight: Font.Bold
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                renderType: Text.NativeRendering
-                            }
-                        }
-                        SparklineChart {
-                            samples: root.api.netRxHistory
-                            lineColor: root.theme.netRx
-                            gridColor: root.theme.divider
-                            baselineColor: root.theme.trackBg
-                            autoScale: true
-                            implicitHeight: Kirigami.Units.gridUnit * 2
-                        }
+                    LabeledGraph {
+                        label: "↓  " + i18n("Down")
+                        accent: root.theme.netRx
+                        valueText: root.api.formatRate(root.api.netRxRate)
+                        samples: root.api.netRxHistory
+                        autoScale: true
                     }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text {
-                                text: "↑  " + i18n("Up")
-                                color: root.theme.netTx
-                                font.weight: Font.DemiBold
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                renderType: Text.NativeRendering
-                            }
-                            Item { Layout.fillWidth: true }
-                            Text {
-                                text: root.api.formatRate(root.api.netTxRate)
-                                color: root.theme.text
-                                font.weight: Font.Bold
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                renderType: Text.NativeRendering
-                            }
-                        }
-                        SparklineChart {
-                            samples: root.api.netTxHistory
-                            lineColor: root.theme.netTx
-                            gridColor: root.theme.divider
-                            baselineColor: root.theme.trackBg
-                            autoScale: true
-                            implicitHeight: Kirigami.Units.gridUnit * 2
-                        }
+                    LabeledGraph {
+                        label: "↑  " + i18n("Up")
+                        accent: root.theme.netTx
+                        valueText: root.api.formatRate(root.api.netTxRate)
+                        samples: root.api.netTxHistory
+                        autoScale: true
                     }
                 }
 
@@ -633,17 +532,17 @@ PlasmaExtras.Representation {
                 }
             }
 
-            // ---- services --------------------------------------------
+            // ---- installed apps --------------------------------------
             SectionCard {
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                Layout.rightMargin: Kirigami.Units.largeSpacing
-                visible: root.api.servicesTotalCount > 0
+                Layout.leftMargin: root.edgeMargin
+                Layout.rightMargin: root.edgeMargin
+                visible: root.api.appsTotalCount > 0
 
                 RowLayout {
                     Layout.fillWidth: true
 
                     Text {
-                        text: i18n("CASAOS SERVICES")
+                        text: i18n("INSTALLED APPS")
                         color: root.theme.textDim
                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
                         font.weight: Font.DemiBold
@@ -652,8 +551,11 @@ PlasmaExtras.Representation {
                     }
                     Item { Layout.fillWidth: true }
                     Text {
-                        text: i18n("%1 / %2 running", root.api.servicesHealthyCount, root.api.servicesTotalCount)
-                        color: root.api.servicesStopped.length === 0 ? root.theme.success : root.theme.warning
+                        text: i18n("%1 / %2 running",
+                                   root.api.appsRunningCount,
+                                   root.api.appsTotalCount)
+                        color: root.api.appsRunningCount === root.api.appsTotalCount
+                            ? root.theme.success : root.theme.warning
                         font.weight: Font.Bold
                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                         renderType: Text.NativeRendering
@@ -665,47 +567,125 @@ PlasmaExtras.Representation {
                     spacing: Kirigami.Units.smallSpacing
 
                     Repeater {
-                        model: root.api.servicesRunning
-                        delegate: Rectangle {
-                            required property string modelData
-                            radius: root.theme.radiusSm
-                            color: root.theme.alpha(root.theme.success, 0.14)
-                            border.color: root.theme.alpha(root.theme.success, 0.3)
-                            border.width: 1
-                            implicitWidth: svcLbl.implicitWidth + Kirigami.Units.smallSpacing * 2
-                            implicitHeight: svcLbl.implicitHeight + Kirigami.Units.smallSpacing
+                        model: root.api.apps
 
-                            Text {
-                                id: svcLbl
-                                anchors.centerIn: parent
-                                text: modelData.replace(/\.service$/, "")
-                                color: root.theme.success
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
-                                font.weight: Font.DemiBold
-                                renderType: Text.NativeRendering
+                        delegate: Rectangle {
+                            id: appTile
+                            required property var modelData
+
+                            readonly property color statusColor: appTile.modelData.running
+                                ? root.theme.success : root.theme.danger
+                            readonly property string iconUrl: root.api.resolveAppIcon(appTile.modelData.icon)
+
+                            implicitWidth: Kirigami.Units.gridUnit * 4.5
+                            implicitHeight: Kirigami.Units.gridUnit * 4.5
+
+                            radius: root.theme.radiusSm
+                            color: appTileArea.containsMouse
+                                ? root.theme.bgHover : root.theme.alpha(root.theme.bgHover, 0.5)
+                            border.width: 1
+                            border.color: root.theme.alpha(appTile.statusColor,
+                                appTileArea.containsMouse ? 0.55 : 0.28)
+
+                            Behavior on border.color { ColorAnimation { duration: 120 } }
+                            Behavior on color { ColorAnimation { duration: 120 } }
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                spacing: 3
+
+                                Item {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                                    Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+
+                                    // letter avatar shown until icon resolves
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: width / 2
+                                        color: root.theme.alpha(appTile.statusColor, 0.18)
+                                        visible: appIcon.status !== Image.Ready
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: appTile.modelData.title.length > 0
+                                                ? appTile.modelData.title.charAt(0).toUpperCase()
+                                                : "?"
+                                            color: appTile.statusColor
+                                            font.weight: Font.Bold
+                                            font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
+                                            renderType: Text.NativeRendering
+                                        }
+                                    }
+
+                                    Image {
+                                        id: appIcon
+                                        anchors.fill: parent
+                                        source: appTile.iconUrl
+                                        smooth: true
+                                        mipmap: true
+                                        asynchronous: true
+                                        fillMode: Image.PreserveAspectFit
+                                        cache: true
+                                        visible: status === Image.Ready
+                                        sourceSize.width: Kirigami.Units.iconSizes.medium * 2
+                                        sourceSize.height: Kirigami.Units.iconSizes.medium * 2
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: 2
+                                    text: appTile.modelData.title
+                                    color: root.theme.text
+                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
+                                    font.weight: Font.DemiBold
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    renderType: Text.NativeRendering
+                                }
                             }
-                        }
-                    }
 
-                    Repeater {
-                        model: root.api.servicesStopped
-                        delegate: Rectangle {
-                            required property string modelData
-                            radius: root.theme.radiusSm
-                            color: root.theme.alpha(root.theme.danger, 0.14)
-                            border.color: root.theme.alpha(root.theme.danger, 0.3)
-                            border.width: 1
-                            implicitWidth: svcOffLbl.implicitWidth + Kirigami.Units.smallSpacing * 2
-                            implicitHeight: svcOffLbl.implicitHeight + Kirigami.Units.smallSpacing
+                            // status badge — a clear ringed dot in the tile
+                            // corner; green = running, red = stopped.
+                            Rectangle {
+                                width: 12
+                                height: 12
+                                radius: 6
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: 5
+                                anchors.rightMargin: 5
+                                color: appTile.statusColor
+                                border.color: root.theme.bgElevated
+                                border.width: 2
 
-                            Text {
-                                id: svcOffLbl
-                                anchors.centerIn: parent
-                                text: modelData.replace(/\.service$/, "")
-                                color: root.theme.danger
-                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
-                                font.weight: Font.DemiBold
-                                renderType: Text.NativeRendering
+                                // soft halo so the status reads at a glance
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: parent.width + 4
+                                    height: width
+                                    radius: width / 2
+                                    z: -1
+                                    color: root.theme.alpha(appTile.statusColor, 0.25)
+                                }
+                            }
+
+                            PC3.ToolTip.visible: appTileArea.containsMouse
+                            PC3.ToolTip.delay: 400
+                            PC3.ToolTip.text: appTile.modelData.title
+                                + (appTile.modelData.status.length ? " — " + appTile.modelData.status : "")
+                                + (appTile.modelData.running ? "" : "\n" + i18n("Not running"))
+                                + "\n" + i18n("Click to open in CasaOS")
+
+                            MouseArea {
+                                id: appTileArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.plasmoidItem.openDashboard()
                             }
                         }
                     }
@@ -714,9 +694,9 @@ PlasmaExtras.Representation {
 
             // ---- system info -----------------------------------------
             SectionCard {
-                Layout.leftMargin: Kirigami.Units.largeSpacing
-                Layout.rightMargin: Kirigami.Units.largeSpacing
-                Layout.bottomMargin: Kirigami.Units.largeSpacing
+                Layout.leftMargin: root.edgeMargin
+                Layout.rightMargin: root.edgeMargin
+                Layout.bottomMargin: root.edgeMargin
                 title: i18n("System")
 
                 KeyValueRow {
@@ -729,14 +709,34 @@ PlasmaExtras.Representation {
                     value: root.api.hostname
                 }
                 KeyValueRow {
-                    visible: root.api.osName.length > 0 || root.api.osVersion.length > 0
+                    visible: root.api.osName.length > 0 || root.api.osVersion.length > 0 || root.api.platform.length > 0
                     label: i18n("OS")
-                    value: (root.api.osName + " " + root.api.osVersion).trim()
+                    value: {
+                        var name = root.api.osName.length > 0 ? root.api.osName : root.api.platform
+                        var ver = root.api.osVersion.length > 0 ? root.api.osVersion : root.api.platformVersion
+                        return (name + " " + ver).trim()
+                    }
                 }
                 KeyValueRow {
-                    visible: root.api.kernelVersion.length > 0
+                    visible: root.api.platformFamily.length > 0
+                        && root.api.platformFamily.toLowerCase() !== root.api.osName.toLowerCase()
+                    label: i18n("Family")
+                    value: root.api.platformFamily
+                }
+                KeyValueRow {
+                    visible: root.api.kernelName.length > 0 || root.api.kernelVersion.length > 0
                     label: i18n("Kernel")
-                    value: root.api.kernelVersion
+                    value: (root.api.kernelName + " " + root.api.kernelVersion).trim()
+                }
+                KeyValueRow {
+                    visible: root.api.virtualization.length > 0
+                    label: i18n("Virtualization")
+                    value: root.api.virtualization
+                }
+                KeyValueRow {
+                    visible: root.api.manufacturer.length > 0
+                    label: i18n("Manufacturer")
+                    value: root.api.manufacturer
                 }
                 KeyValueRow {
                     visible: root.api.hardwareModel.length > 0
@@ -744,14 +744,58 @@ PlasmaExtras.Representation {
                     value: root.api.hardwareModel
                 }
                 KeyValueRow {
+                    visible: root.api.motherboard.length > 0
+                    label: i18n("Motherboard")
+                    value: root.api.motherboard
+                }
+                KeyValueRow {
+                    visible: root.api.biosVendor.length > 0 || root.api.biosVersion.length > 0
+                    label: i18n("BIOS")
+                    value: {
+                        var parts = []
+                        if (root.api.biosVendor.length > 0) parts.push(root.api.biosVendor)
+                        if (root.api.biosVersion.length > 0) parts.push(root.api.biosVersion)
+                        if (root.api.biosDate.length > 0) parts.push("(" + root.api.biosDate + ")")
+                        return parts.join(" ")
+                    }
+                }
+                KeyValueRow {
                     visible: root.api.hardwareArch.length > 0
                     label: i18n("Architecture")
                     value: root.api.hardwareArch
                 }
                 KeyValueRow {
-                    visible: root.api.cpuModel.length > 0
+                    visible: root.api.cpuVendorDisplay.length > 0 || root.api.cpuCores > 0
                     label: i18n("CPU")
-                    value: root.api.cpuModel
+                    value: {
+                        var parts = []
+                        if (root.api.cpuVendorDisplay.length > 0) parts.push(root.api.cpuVendorDisplay)
+                        if (root.api.cpuCores > 0) parts.push(i18n("%1 cores", root.api.cpuCores))
+                        if (root.api.cpuTemp > 0) parts.push(root.api.formatTemp(root.api.cpuTemp))
+                        return parts.join(" · ")
+                    }
+                }
+                KeyValueRow {
+                    visible: root.api.memTotal > 0
+                    label: i18n("Memory")
+                    value: root.api.formatBytes(root.api.memTotal)
+                }
+                KeyValueRow {
+                    visible: root.api.diskTotal > 0
+                    label: i18n("Storage")
+                    value: root.api.formatBytes(root.api.diskTotal)
+                        + (root.api.diskHealthy ? "" : " · " + i18n("health warning"))
+                    valueColor: root.api.diskHealthy ? "" : root.theme.warning
+                }
+                KeyValueRow {
+                    visible: root.api.processCount > 0
+                    label: i18n("Processes")
+                    value: String(root.api.processCount)
+                }
+                KeyValueRow {
+                    visible: root.api.timezone.length > 0
+                    label: i18n("Timezone")
+                    value: root.api.timezone
                 }
                 KeyValueRow {
                     visible: root.api.uptimeSeconds > 0

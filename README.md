@@ -21,7 +21,8 @@ A KDE Plasma 6 panel widget that monitors your [CasaOS](https://github.com/IceWh
 - CPU and RAM history sparklines, plus dedicated download/upload sparklines
 - Per-interface network breakdown
 - CasaOS services panel (running/stopped chips)
-- System info card — hostname, OS, kernel, hardware, architecture, CPU model, uptime
+- Installed apps grid with store icons and running-state dots
+- System info card — CPU (vendor · cores · temperature), architecture, memory, storage and CasaOS version. Extra fields (kernel, OS, hostname, uptime, BIOS, …) are shown automatically when your CasaOS build exposes them — the stock CasaOS API only reports architecture and CPU vendor
 - Three header buttons: **refresh**, **open dashboard**, **reboot server** (with confirmation)
 
 The widget is dark, minimal, and data-rich by design — the same Power-Deck-style aesthetic regardless of your active Plasma color scheme.
@@ -35,13 +36,26 @@ The widget is dark, minimal, and data-rich by design — the same Power-Deck-sty
 
 ## Installation
 
+### One-line install (recommended)
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/T3lluz/CasaOSWidget/main/install.sh)
+```
+
+The script will shallow-clone the repo into a temp directory and register the
+widget through `kpackagetool6`. Re-run the same command at any time to upgrade.
+
+### From a local checkout
+
 ```bash
 git clone https://github.com/T3lluz/CasaOSWidget.git
 cd CasaOSWidget
 ./install.sh
 ```
 
-Then reload Plasma:
+### After installing
+
+Reload Plasma so the widget shows up:
 
 ```bash
 kquitapp6 plasmashell && kstart plasmashell
@@ -49,7 +63,17 @@ kquitapp6 plasmashell && kstart plasmashell
 
 Add the widget: right-click the panel → **Add Widgets** → search **CasaOS Homelab**. Stretch it on the panel to whatever width you want — the layout adapts.
 
-To upgrade an existing install, run `./install.sh` again.
+### Uninstall
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/T3lluz/CasaOSWidget/main/install.sh) --uninstall
+```
+
+Or, from a local checkout:
+
+```bash
+./install.sh --uninstall
+```
 
 ## Configuration
 
@@ -69,7 +93,8 @@ The widget authenticates against the CasaOS user API (`POST /v1/users/login`) an
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /v1/sys/utilization` | CPU, RAM, disk, per-interface network |
-| `GET /v1/sys/hardware/info` (falls back to `/v1/sys/hardware`) | OS, kernel, hostname, hardware, uptime |
+| `GET /v1/sys/hardware/info` (falls back to `/v1/sys/hardware`) | Device model + CPU architecture |
+| `GET /v2/app_management/compose` (falls back to `/v1/apps`) | Installed apps, status and store icons |
 | `GET /v2/casaos/health/services` | Running and stopped `casaos-*` services |
 | `GET /v1/sys/version/current` | CasaOS version string |
 | `PUT /v1/sys/restart` | Reboot the server (header button) |
@@ -99,7 +124,7 @@ contents/
     FullRepresentation.qml    # Rich popup
     GaugeRing.qml             # Animated dial gauge
     SparklineChart.qml        # Bezier sparkline with gradient fill
-    StatPill.qml              # Inline label + value + mini bar
+    MetricIcon.qml            # Canvas-drawn metric / action icons
     configGeneral.qml         # KCM page
 ```
 

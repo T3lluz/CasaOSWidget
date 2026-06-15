@@ -45,9 +45,22 @@ QtObject {
     property string hardwareArch: ""
     property string osName: ""
     property string osVersion: ""
+    property string kernelName: ""
     property string kernelVersion: ""
     property string hostname: ""
     property double uptimeSeconds: 0
+    property string platform: ""
+    property string platformFamily: ""
+    property string platformVersion: ""
+    property string biosVendor: ""
+    property string biosVersion: ""
+    property string biosDate: ""
+    property string motherboard: ""
+    property string manufacturer: ""
+    property string virtualization: ""
+    property string timezone: ""
+    property string bootTime: ""
+    property int processCount: 0
 
     // ---- network ---------------------------------------------------------
     property var networkInterfaces: []
@@ -63,6 +76,10 @@ QtObject {
     property var servicesRunning: []
     property var servicesStopped: []
 
+    // ---- installed apps --------------------------------------------------
+    // Each app: { name, title, status, running, icon }
+    property var apps: []
+
     // ---- history (sparklines) -------------------------------------------
     property var cpuHistory: []
     property var memHistory: []
@@ -72,6 +89,23 @@ QtObject {
     readonly property bool isConfigured: baseUrl.length > 0 && username.length > 0 && password.length > 0
     readonly property int servicesHealthyCount: servicesRunning.length
     readonly property int servicesTotalCount: servicesRunning.length + servicesStopped.length
+    readonly property int appsRunningCount: {
+        var n = 0
+        for (var i = 0; i < apps.length; i++) if (apps[i].running) n++
+        return n
+    }
+    readonly property int appsTotalCount: apps.length
+
+    // CasaOS reports the CPU only as a vendor keyword ("amd"/"intel"/"arm").
+    // Present it in a recognisable form for the System card.
+    readonly property string cpuVendorDisplay: {
+        var m = String(cpuModel || "").trim().toLowerCase()
+        if (m.length === 0) return ""
+        if (m === "amd")   return "AMD"
+        if (m === "intel") return "Intel"
+        if (m === "arm")   return "ARM"
+        return cpuModel
+    }
 
     signal dataUpdated()
     signal restartRequested(bool success, string message)
@@ -100,6 +134,24 @@ QtObject {
 
     function dashboardUrl() {
         return normalizedBaseUrl()
+    }
+
+    // Resolve an app icon reference returned by the CasaOS app_management
+    // endpoint into a real URL. CasaOS variously returns:
+    //   • a full https URL (e.g. jsdelivr CDN, app store)
+    //   • a path relative to the CasaOS server ("/v2/...")
+    //   • a bare filename
+    // Anything we can't sensibly resolve becomes "" so the UI shows the
+    // letter-avatar fallback.
+    function resolveAppIcon(iconRef) {
+        if (!iconRef) return ""
+        var s = String(iconRef).trim()
+        if (s.length === 0) return ""
+        if (/^(https?:|data:)/i.test(s)) return s
+        var base = normalizedBaseUrl()
+        if (base.length === 0) return ""
+        if (s.charAt(0) === "/") return base + s
+        return base + "/" + s
     }
 
     function formatBytes(bytes) {
@@ -394,20 +446,107 @@ QtObject {
         return true
     }
 
+    function _pickField(obj) {
+        if (!obj) return undefined
+        for (var i = 1; i < arguments.length; i++) {
+            var k = arguments[i]
+            var v = obj[k]
+            if (v !== undefined && v !== null && v !== "") return v
+        }
+        return undefined
+    }
+
     function parseHardware(payload) {
         if (!payload || typeof payload !== "object" || !payload.data) {
             return
         }
         var d = payload.data
-        if (d.drive_model !== undefined) hardwareModel = d.drive_model
-        if (d.model !== undefined && hardwareModel.length === 0) hardwareModel = d.model
-        if (d.arch !== undefined) hardwareArch = d.arch
-        if (d.os_name !== undefined) osName = d.os_name
-        if (d.os_version !== undefined) osVersion = d.os_version
-        if (d.kernel !== undefined) kernelVersion = d.kernel
-        if (d.kernel_version !== undefined) kernelVersion = d.kernel_version
-        if (d.hostname !== undefined) hostname = d.hostname
-        if (d.uptime !== undefined) uptimeSeconds = Number(d.uptime) || 0
+        var v
+
+        v = _pickField(d, "drive_model", "driveModel", "DriveModel")
+        if (v !== undefined) hardwareModel = String(v)
+        if (hardwareModel.length === 0) {
+            v = _pickField(d, "model", "Model", "product_name", "ProductName")
+            if (v !== undefined) hardwareModel = String(v)
+        }
+
+        v = _pickField(d, "arch", "Arch", "architecture", "Architecture")
+        if (v !== undefined) hardwareArch = String(v)
+
+        v = _pickField(d, "os_name", "osName", "OSName", "distribution", "Distribution")
+        if (v !== undefined) osName = String(v)
+
+        v = _pickField(d, "os_version", "osVersion", "OSVersion", "distribution_version", "DistributionVersion")
+        if (v !== undefined) osVersion = String(v)
+
+        // CasaOS sometimes returns "kernel" as the kernel name ("Linux")
+        // and "kernel_version" as the version ("6.5.0-…"). Keep them
+        // separate so the UI can show both.
+        v = _pickField(d, "kernel", "Kernel", "kernel_name", "KernelName")
+        if (v !== undefined && /[a-zA-Z]/.test(String(v)) && !/^\d/.test(String(v))) {
+            kernelName = String(v)
+        }
+
+        v = _pickField(d, "kernel_version", "kernelVersion", "KernelVersion")
+        if (v !== undefined) {
+            kernelVersion = String(v)
+        } else if (kernelName.length > 0 && /^\d/.test(kernelName)) {
+            // some builds return only a numeric "kernel" field
+            kernelVersion = kernelName
+            kernelName = ""
+        }
+
+        v = _pickField(d, "hostname", "Hostname", "HostName", "host_name")
+        if (v !== undefined) hostname = String(v)
+
+        v = _pickField(d, "uptime", "Uptime", "uptime_seconds", "UptimeSeconds")
+        if (v !== undefined) uptimeSeconds = Number(v) || 0
+
+        v = _pickField(d, "platform", "Platform")
+        if (v !== undefined) platform = String(v)
+
+        v = _pickField(d, "platform_family", "platformFamily", "PlatformFamily")
+        if (v !== undefined) platformFamily = String(v)
+
+        v = _pickField(d, "platform_version", "platformVersion", "PlatformVersion")
+        if (v !== undefined) platformVersion = String(v)
+
+        v = _pickField(d, "bios_vendor", "biosVendor", "BiosVendor", "bios", "Bios")
+        if (v !== undefined) biosVendor = String(v)
+
+        v = _pickField(d, "bios_version", "biosVersion", "BiosVersion")
+        if (v !== undefined) biosVersion = String(v)
+
+        v = _pickField(d, "bios_date", "biosDate", "BiosDate", "bios_release_date")
+        if (v !== undefined) biosDate = String(v)
+
+        v = _pickField(d, "board_name", "boardName", "BoardName",
+                          "motherboard", "Motherboard", "board_product")
+        if (v !== undefined) motherboard = String(v)
+
+        v = _pickField(d, "vendor", "Vendor", "manufacturer", "Manufacturer",
+                          "sys_vendor", "SystemVendor")
+        if (v !== undefined) manufacturer = String(v)
+
+        v = _pickField(d, "virtualization", "Virtualization",
+                          "virt", "Virt", "virtualization_system")
+        if (v !== undefined) virtualization = String(v)
+
+        v = _pickField(d, "timezone", "Timezone", "TimeZone", "tz")
+        if (v !== undefined) timezone = String(v)
+
+        v = _pickField(d, "boot_time", "bootTime", "BootTime")
+        if (v !== undefined) bootTime = String(v)
+
+        v = _pickField(d, "procs", "Procs", "processes", "Processes", "process_count")
+        if (v !== undefined) processCount = Number(v) || 0
+
+        // CasaOS hardware/info sometimes returns a fuller CPU name here
+        // than /v1/sys/utilization (which can be just the vendor on AMD).
+        v = _pickField(d, "cpu_model", "cpuModel", "CPUModel", "cpu_name", "CPUName")
+        if (v !== undefined && String(v).length > cpuModel.length) {
+            cpuModel = String(v)
+        }
     }
 
     function parseHealth(payload) {
@@ -416,6 +555,91 @@ QtObject {
         }
         servicesRunning = payload.data.running || []
         servicesStopped = payload.data.not_running || []
+    }
+
+    function _titleFromField(t) {
+        if (!t) return ""
+        if (typeof t === "string") return t
+        if (typeof t === "object") {
+            return t.en_us || t.en_US || t.en || t["en-US"]
+                || t.custom || t[Object.keys(t)[0]] || ""
+        }
+        return ""
+    }
+
+    function _appTitle(a) {
+        if (!a) return ""
+        // v2 compose apps nest the human title under store_info.title.
+        var si = a.store_info || a.storeInfo
+        if (si) {
+            var st = _titleFromField(si.title)
+            if (st.length) return st
+        }
+        var direct = _titleFromField(a.title)
+        if (direct.length) return direct
+        return a.name || a.app_name || a.id || a.main_app || ""
+    }
+
+    // Pull an icon reference out of an app entry, accounting for the
+    // several shapes CasaOS uses (v2 compose nests it under store_info).
+    function _appIcon(a) {
+        if (!a) return ""
+        var si = a.store_info || a.storeInfo
+        if (si && si.icon) return si.icon
+        if (a.icon) return a.icon
+        if (a.image && a.image.icon) return a.image.icon
+        return ""
+    }
+
+    function _appIsRunning(status) {
+        if (!status) return false
+        var s = String(status).toLowerCase()
+        return s.indexOf("running") >= 0 || s === "up" || s === "active" || s === "started"
+    }
+
+    function parseApps(payload) {
+        if (!payload) return false
+        var data = payload.data !== undefined ? payload.data : payload
+        var arr = []
+        if (Array.isArray(data)) {
+            arr = data
+        } else if (data && typeof data === "object") {
+            for (var k in data) {
+                var v = data[k]
+                if (v && typeof v === "object") {
+                    arr.push(Object.assign({ name: k }, v))
+                }
+            }
+        } else {
+            return false
+        }
+
+        var out = []
+        for (var i = 0; i < arr.length; i++) {
+            var a = arr[i]
+            if (!a || typeof a !== "object") continue
+            var status = a.status !== undefined ? a.status
+                       : (a.state !== undefined ? a.state : "")
+            if (status && typeof status === "object") {
+                status = status.main || status.status || status.state || ""
+            }
+            var name = a.name
+                || (a.compose && a.compose.name)
+                || a.main_app || a.app_name || a.id || ""
+            out.push({
+                name: name,
+                title: _appTitle(a) || name,
+                status: String(status || ""),
+                running: _appIsRunning(status),
+                icon: _appIcon(a)
+            })
+        }
+        out.sort(function(x, y) {
+            if (x.running !== y.running) return x.running ? -1 : 1
+            return x.title.toLowerCase() < y.title.toLowerCase() ? -1 : 1
+        })
+        apps = out
+        return true
     }
 
     // ---- public actions --------------------------------------------------
@@ -480,7 +704,7 @@ QtObject {
         }
 
         var afterAuth = function() {
-            var pending = 3
+            var pending = 4
             var firstError = ""
 
             function doneOne(success, errMsg) {
@@ -531,6 +755,17 @@ QtObject {
             request("GET", "/v2/casaos/health/services", null, function(ok, httpStatus, parsed) {
                 if (ok) parseHealth(parsed)
                 doneOne(true, "")
+            })
+
+            request("GET", "/v2/app_management/compose", null, function(ok, httpStatus, parsed) {
+                if (ok && parseApps(parsed)) {
+                    doneOne(true, "")
+                    return
+                }
+                request("GET", "/v1/apps", null, function(ok2, http2, parsed2) {
+                    if (ok2) parseApps(parsed2)
+                    doneOne(true, "")
+                })
             })
         }
 
