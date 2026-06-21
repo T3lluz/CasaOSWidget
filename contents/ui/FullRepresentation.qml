@@ -379,7 +379,7 @@ PlasmaExtras.Representation {
                         Text {
                             text: i18n("CASAOS")
                             color: Theme.muted
-                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
+                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             font.weight: Font.DemiBold
                             font.letterSpacing: 2.2
                             elide: Text.ElideRight
@@ -427,7 +427,7 @@ PlasmaExtras.Representation {
                             text: i18n("Updated %1", Qt.formatTime(new Date(root.api.lastUpdateMs), "HH:mm:ss"))
                             color: Theme.muted
                             opacity: 0.7
-                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
+                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             renderType: Text.NativeRendering
                         }
                     }
@@ -580,7 +580,7 @@ PlasmaExtras.Representation {
                                        root.api.formatBytes(modelData.bytesRecv || modelData.bytes_recv || 0),
                                        root.api.formatBytes(modelData.bytesSent || modelData.bytes_sent || 0))
                             color: Kirigami.Theme.disabledTextColor
-                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
+                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             renderType: Text.NativeRendering
                         }
                     }
@@ -626,17 +626,9 @@ PlasmaExtras.Representation {
                             implicitHeight: Kirigami.Units.gridUnit * 4.5
 
                             radius: Kirigami.Units.smallSpacing * 1.25
-                            color: appTileArea.containsMouse
-                                ? Theme.alpha(Kirigami.Theme.textColor, 0.07)
-                                : Theme.alpha(Kirigami.Theme.textColor, 0.035)
+                            color: Theme.alpha(Kirigami.Theme.textColor, 0.035)
                             border.width: 1
-                            border.color: Theme.alpha(appTile.statusColor,
-                                appTileArea.containsMouse ? 0.55 : 0.28)
-                            scale: appTileArea.pressed ? 0.97 : 1.0
-
-                            Behavior on border.color { ColorAnimation { duration: Theme.durFast; easing.type: Theme.easeOut } }
-                            Behavior on color { ColorAnimation { duration: Theme.durFast; easing.type: Theme.easeOut } }
-                            Behavior on scale { NumberAnimation { duration: Theme.durFast; easing.type: Theme.easeOut } }
+                            border.color: Theme.alpha(appTile.statusColor, 0.28)
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -718,7 +710,7 @@ PlasmaExtras.Representation {
                                     Layout.topMargin: 2
                                     text: appTile.modelData.title
                                     color: Kirigami.Theme.textColor
-                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
+                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                     font.weight: Font.DemiBold
                                     horizontalAlignment: Text.AlignHCenter
                                     elide: Text.ElideRight
@@ -750,21 +742,6 @@ PlasmaExtras.Representation {
                                     z: -1
                                     color: Theme.alpha(appTile.statusColor, 0.25)
                                 }
-                            }
-
-                            PC3.ToolTip.visible: appTileArea.containsMouse
-                            PC3.ToolTip.delay: 400
-                            PC3.ToolTip.text: appTile.modelData.title
-                                + (appTile.modelData.status.length ? " — " + appTile.modelData.status : "")
-                                + (appTile.modelData.running ? "" : "\n" + i18n("Not running"))
-                                + "\n" + i18n("Click to open in CasaOS")
-
-                            MouseArea {
-                                id: appTileArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.plasmoidItem.openDashboard()
                             }
                         }
                     }

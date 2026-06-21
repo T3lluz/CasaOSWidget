@@ -48,6 +48,12 @@ Canvas {
                 ctx.moveTo(pad, y)
                 ctx.lineTo(pad + w, y)
             }
+            // faint vertical gridlines add depth without distracting
+            for (var gv = 1; gv < 4; gv++) {
+                var xg = pad + (w / 4) * gv
+                ctx.moveTo(xg, pad)
+                ctx.lineTo(xg, pad + h)
+            }
             ctx.stroke()
         }
 
@@ -96,11 +102,16 @@ Canvas {
         ctx.lineTo(pad, pad + h)
         ctx.closePath()
         var grad = ctx.createLinearGradient(0, pad, 0, pad + h)
-        grad.addColorStop(0, Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.35))
+        grad.addColorStop(0, Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.42))
+        grad.addColorStop(0.55, Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.12))
         grad.addColorStop(1, Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.0))
         ctx.fillStyle = grad
         ctx.fill()
 
+        // stroke the curve with a soft glow so the trend pops on any scheme
+        ctx.save()
+        ctx.shadowColor = Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.6)
+        ctx.shadowBlur = 6
         ctx.beginPath()
         ctx.moveTo(xFor(0), yFor(samples[0]))
         for (var j = 1; j < samples.length; j++) {
@@ -112,16 +123,22 @@ Canvas {
             ctx.bezierCurveTo(cx2, py2, cx2, y2, x2, y2)
         }
         ctx.strokeStyle = lineColor
-        ctx.lineWidth = 1.8
+        ctx.lineWidth = 2
         ctx.lineJoin = "round"
         ctx.lineCap = "round"
         ctx.stroke()
+        ctx.restore()
 
+        // endpoint marker: a soft halo with a bright core
         var lastX = xFor(samples.length - 1)
         var lastY = yFor(samples[samples.length - 1])
         ctx.beginPath()
-        ctx.arc(lastX, lastY, 2.5, 0, Math.PI * 2)
-        ctx.fillStyle = lineColor
+        ctx.arc(lastX, lastY, 5, 0, Math.PI * 2)
+        ctx.fillStyle = Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.22)
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(lastX, lastY, 2.6, 0, Math.PI * 2)
+        ctx.fillStyle = Qt.lighter(lineColor, 1.25)
         ctx.fill()
     }
 }
