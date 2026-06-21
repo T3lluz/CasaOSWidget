@@ -10,12 +10,18 @@ import org.kde.kirigami as Kirigami
 //
 // Supported kinds: "cpu" "ram" "disk" "down" "up"
 //                  "server" "refresh" "dashboard" "reboot"
+//                  "chart" "network"
 Item {
     id: root
 
     property string kind: "cpu"
     property color color: Kirigami.Theme.textColor
     property real strokeWidth: 1.6
+    // Fraction of the box the 24×24 artwork fills. Power-Deck's glyphs draw
+    // their SVG art inset inside the box (~18 of 24 units, leaving padding),
+    // so our edge-to-edge glyphs are scaled down to the same footprint and
+    // read at the same visual size as Power-Deck instead of bigger.
+    property real contentScale: 0.8
 
     implicitWidth: Kirigami.Units.iconSizes.small
     implicitHeight: Kirigami.Units.iconSizes.small
@@ -31,8 +37,9 @@ Item {
             ctx.reset()
             ctx.clearRect(0, 0, width, height)
 
-            // draw inside a normalized 24×24 box
-            var scale = Math.min(width, height) / 24
+            // draw inside a normalized 24×24 box, inset by contentScale so
+            // the artwork carries the same padding as Power-Deck's SVGs
+            var scale = Math.min(width, height) / 24 * root.contentScale
             ctx.translate((width  - 24 * scale) / 2,
                           (height - 24 * scale) / 2)
             ctx.scale(scale, scale)
@@ -53,6 +60,8 @@ Item {
             case "refresh":  drawRefresh(ctx);  break
             case "dashboard":drawDashboard(ctx);break
             case "reboot":   drawReboot(ctx);   break
+            case "chart":    drawChart(ctx);    break
+            case "network":  drawNetwork(ctx);  break
             }
         }
 
@@ -205,10 +214,41 @@ Item {
             ctx.arc(12, 13, 8, -Math.PI * 0.85, Math.PI * 1.85)
             ctx.stroke()
         }
+
+        function drawChart(ctx) {
+            // L-shaped axis
+            ctx.lineWidth = 1.6
+            ctx.beginPath()
+            ctx.moveTo(4, 4); ctx.lineTo(4, 20); ctx.lineTo(20, 20)
+            ctx.stroke()
+            // sparkline trend
+            ctx.lineWidth = 2
+            ctx.beginPath()
+            ctx.moveTo(6, 16); ctx.lineTo(10, 11); ctx.lineTo(13, 14); ctx.lineTo(20, 6)
+            ctx.stroke()
+            // dot at the leading edge
+            ctx.beginPath(); ctx.arc(20, 6, 1.7, 0, Math.PI * 2); ctx.fill()
+        }
+
+        function drawNetwork(ctx) {
+            ctx.lineWidth = root.strokeWidth
+            // globe outline
+            ctx.beginPath(); ctx.arc(12, 12, 8.5, 0, Math.PI * 2); ctx.stroke()
+            // equator
+            ctx.beginPath(); ctx.moveTo(3.5, 12); ctx.lineTo(20.5, 12); ctx.stroke()
+            // meridians
+            ctx.beginPath()
+            ctx.moveTo(12, 3.5); ctx.bezierCurveTo(6, 7, 6, 17, 12, 20.5)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(12, 3.5); ctx.bezierCurveTo(18, 7, 18, 17, 12, 20.5)
+            ctx.stroke()
+        }
     }
 
     onColorChanged: cv.requestPaint()
     onKindChanged: cv.requestPaint()
+    onContentScaleChanged: cv.requestPaint()
     onWidthChanged: cv.requestPaint()
     onHeightChanged: cv.requestPaint()
 }

@@ -20,11 +20,13 @@ import org.kde.kirigami as Kirigami
 // can never swallow the press, plus a TapHandler is registered as a
 // belt-and-braces fallback for the rare case where MouseArea events
 // don't propagate (see KDE bug 518024).
+//
+// Colors come from the `Theme` singleton (contents/ui/Theme.qml) so the
+// panel matches the popup and the rest of the Power-Deck app pack.
 Item {
     id: root
 
     required property var api
-    required property var theme
     required property var plasmoidItem      // PlasmoidItem instance from main.qml
 
     readonly property bool isVertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
@@ -42,12 +44,18 @@ Item {
     readonly property bool vDisk: Plasmoid.configuration.showDisk
     readonly property bool vNet:  Plasmoid.configuration.showNetwork
 
+    // Panel glyph size, matched to Power-Deck: scale the icon with the
+    // panel thickness (capped at gridUnit*2) so it fills the panel the same
+    // way instead of staying at a fixed small icon size.
+    readonly property int panelIconSize: Math.round(
+        Math.min(isVertical ? width : height, Kirigami.Units.gridUnit * 2) * 0.92)
+
     implicitWidth: isVertical
-        ? Math.max(Kirigami.Units.gridUnit * 2.5, verticalCol.implicitWidth + Kirigami.Units.smallSpacing * 2)
-        : horizontalRow.implicitWidth + Kirigami.Units.smallSpacing * 2
+        ? Math.max(Kirigami.Units.gridUnit * 1.75, verticalCol.implicitWidth + Kirigami.Units.smallSpacing * 2)
+        : horizontalRow.implicitWidth + Kirigami.Units.largeSpacing * 2
     implicitHeight: isVertical
         ? verticalCol.implicitHeight + Kirigami.Units.smallSpacing * 2
-        : Math.max(Kirigami.Units.gridUnit * 1.6, horizontalRow.implicitHeight)
+        : Kirigami.Units.gridUnit * 1.75
 
     Layout.minimumWidth: implicitWidth
     Layout.preferredWidth: implicitWidth
@@ -86,8 +94,8 @@ Item {
             visible: Plasmoid.configuration.showStatusDot
             Layout.alignment: Qt.AlignVCenter
             width: 8; height: 8; radius: 4
-            color: root.api.isConnected ? root.theme.success
-                : (root.api.status === "connecting" ? root.theme.warning : root.theme.danger)
+            color: root.api.isConnected ? Theme.success
+                : (root.api.status === "connecting" ? Theme.warning : Theme.danger)
 
             SequentialAnimation on opacity {
                 running: root.api.status === "connecting"
@@ -99,11 +107,10 @@ Item {
 
         Metric {
             visible: Plasmoid.configuration.showCpu
-            theme: root.theme
             kind: "cpu"
             valueText: root.api.cpuPercent >= 0 ? Math.round(root.api.cpuPercent) + "%" : "—"
             percent: root.api.cpuPercent
-            accent: root.theme.cpu
+            accent: Theme.cpu
             showIcon: root.showIcons
             showValue: root.showValues
         }
@@ -112,10 +119,9 @@ Item {
 
         Metric {
             visible: Plasmoid.configuration.showCpuTemp && root.api.cpuTemp > 0
-            theme: root.theme
             kind: "cpu"
             valueText: root.api.formatTemp(root.api.cpuTemp)
-            accent: root.theme.warning
+            accent: Theme.temp
             showIcon: false
             showValue: root.showValues
         }
@@ -124,11 +130,10 @@ Item {
 
         Metric {
             visible: Plasmoid.configuration.showRam
-            theme: root.theme
             kind: "ram"
             valueText: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
             percent: root.api.memPercent
-            accent: root.theme.ram
+            accent: Theme.ram
             showIcon: root.showIcons
             showValue: root.showValues
         }
@@ -137,11 +142,10 @@ Item {
 
         Metric {
             visible: Plasmoid.configuration.showDisk
-            theme: root.theme
             kind: "disk"
             valueText: root.api.diskPairCompact()
             percent: root.api.diskPercent
-            accent: root.api.diskHealthy ? root.theme.disk : root.theme.danger
+            accent: root.api.diskHealthy ? Theme.disk : Theme.danger
             showIcon: root.showIcons
             showValue: root.showValues
         }
@@ -150,10 +154,9 @@ Item {
 
         Metric {
             visible: Plasmoid.configuration.showNetwork
-            theme: root.theme
             kind: "down"
             valueText: root.api.formatRate(root.api.netRxRate)
-            accent: root.theme.netRx
+            accent: Theme.netRx
             showIcon: root.showIcons
             showValue: root.showValues
         }
@@ -162,10 +165,9 @@ Item {
 
         Metric {
             visible: Plasmoid.configuration.showNetwork
-            theme: root.theme
             kind: "up"
             valueText: root.api.formatRate(root.api.netTxRate)
-            accent: root.theme.netTx
+            accent: Theme.netTx
             showIcon: root.showIcons
             showValue: root.showValues
         }
@@ -182,47 +184,47 @@ Item {
             visible: Plasmoid.configuration.showStatusDot
             Layout.alignment: Qt.AlignHCenter
             width: 8; height: 8; radius: 4
-            color: root.api.isConnected ? root.theme.success
-                : (root.api.status === "connecting" ? root.theme.warning : root.theme.danger)
+            color: root.api.isConnected ? Theme.success
+                : (root.api.status === "connecting" ? Theme.warning : Theme.danger)
         }
         VMetric {
             visible: Plasmoid.configuration.showCpu
-            theme: root.theme; kind: "cpu"; accent: root.theme.cpu
+            kind: "cpu"; accent: Theme.cpu
             valueText: root.api.cpuPercent >= 0 ? Math.round(root.api.cpuPercent) + "%" : "—"
             showIcon: root.showIcons; showValue: root.showValues
         }
         Sep { vertical: true; show: root.sepsOn && root.vTemp && root.vCpu }
         VMetric {
             visible: Plasmoid.configuration.showCpuTemp && root.api.cpuTemp > 0
-            theme: root.theme; kind: "cpu"; accent: root.theme.warning
+            kind: "cpu"; accent: Theme.temp
             valueText: root.api.formatTemp(root.api.cpuTemp)
             showIcon: false; showValue: root.showValues
         }
         Sep { vertical: true; show: root.sepsOn && root.vRam && (root.vCpu || root.vTemp) }
         VMetric {
             visible: Plasmoid.configuration.showRam
-            theme: root.theme; kind: "ram"; accent: root.theme.ram
+            kind: "ram"; accent: Theme.ram
             valueText: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
             showIcon: root.showIcons; showValue: root.showValues
         }
         Sep { vertical: true; show: root.sepsOn && root.vDisk && (root.vCpu || root.vTemp || root.vRam) }
         VMetric {
             visible: Plasmoid.configuration.showDisk
-            theme: root.theme; kind: "disk"; accent: root.theme.disk
+            kind: "disk"; accent: Theme.disk
             valueText: root.api.diskPairCompact()
             showIcon: root.showIcons; showValue: root.showValues
         }
         Sep { vertical: true; show: root.sepsOn && root.vNet && (root.vCpu || root.vTemp || root.vRam || root.vDisk) }
         VMetric {
             visible: Plasmoid.configuration.showNetwork
-            theme: root.theme; kind: "down"; accent: root.theme.netRx
+            kind: "down"; accent: Theme.netRx
             valueText: root.api.formatRate(root.api.netRxRate)
             showIcon: root.showIcons; showValue: root.showValues
         }
         Sep { vertical: true; show: root.sepsOn && root.vNet }
         VMetric {
             visible: Plasmoid.configuration.showNetwork
-            theme: root.theme; kind: "up"; accent: root.theme.netTx
+            kind: "up"; accent: Theme.netTx
             valueText: root.api.formatRate(root.api.netTxRate)
             showIcon: root.showIcons; showValue: root.showValues
         }
@@ -294,14 +296,13 @@ Item {
         implicitWidth: 3
         implicitHeight: 3
         radius: 1.5
-        color: root.theme.textMuted
+        color: Theme.muted
         Layout.alignment: vertical ? Qt.AlignHCenter : Qt.AlignVCenter
     }
 
     // ---- shared metric chip (horizontal) -------------------------------
     component Metric: RowLayout {
         id: m
-        required property var theme
         required property string kind
         required property string valueText
         required property color accent
@@ -310,22 +311,23 @@ Item {
         property bool showValue: true
 
         Layout.alignment: Qt.AlignVCenter
-        spacing: 4
+        spacing: Kirigami.Units.smallSpacing
 
         MetricIcon {
             visible: m.showIcon
             kind: m.kind
             color: m.accent
-            Layout.preferredWidth: Kirigami.Units.iconSizes.small
-            Layout.preferredHeight: Kirigami.Units.iconSizes.small
+            Layout.alignment: Qt.AlignVCenter
+            Layout.preferredWidth: root.panelIconSize
+            Layout.preferredHeight: root.panelIconSize
         }
 
         Text {
             visible: m.showValue
             text: m.valueText
-            color: m.theme.text
-            font.weight: Font.Bold
-            font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
+            color: Kirigami.Theme.textColor
+            font.weight: Font.DemiBold
+            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
             renderType: Text.NativeRendering
         }
 
@@ -334,7 +336,7 @@ Item {
             Layout.preferredWidth: Kirigami.Units.gridUnit * 1.6
             Layout.preferredHeight: 4
             radius: 2
-            color: m.theme.trackBg
+            color: Theme.alpha(Kirigami.Theme.textColor, 0.12)
             Layout.leftMargin: 2
 
             Rectangle {
@@ -342,7 +344,7 @@ Item {
                 height: parent.height
                 radius: parent.radius
                 color: m.accent
-                Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
+                Behavior on width { NumberAnimation { duration: 400; easing.type: Theme.easeOut } }
             }
         }
     }
@@ -350,7 +352,6 @@ Item {
     // ---- shared metric chip (vertical) ---------------------------------
     component VMetric: ColumnLayout {
         id: vm
-        required property var theme
         required property string kind
         required property string valueText
         required property color accent
@@ -365,15 +366,15 @@ Item {
             kind: vm.kind
             color: vm.accent
             Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: Kirigami.Units.iconSizes.small
-            Layout.preferredHeight: Kirigami.Units.iconSizes.small
+            Layout.preferredWidth: root.panelIconSize
+            Layout.preferredHeight: root.panelIconSize
         }
         Text {
             visible: vm.showValue
             Layout.alignment: Qt.AlignHCenter
             text: vm.valueText
             color: vm.accent
-            font.weight: Font.Bold
+            font.weight: Font.DemiBold
             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
             renderType: Text.NativeRendering
         }

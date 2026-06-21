@@ -10,10 +10,10 @@ import org.kde.kirigami as Kirigami
 PlasmoidItem {
     id: root
 
-    // Expose api and theme so bindings like `root.api` resolve cleanly
-    // both inside this file and across Compact/Full representations.
+    // Expose api so bindings like `root.api` resolve cleanly both inside
+    // this file and across Compact/Full representations. Colors come from
+    // the `Theme` singleton (contents/ui/Theme.qml), reachable directly.
     readonly property alias api: apiImpl
-    readonly property alias theme: themeImpl
 
     Plasmoid.icon: "computer"
     Plasmoid.title: Plasmoid.configuration.serverName || i18n("CasaOS Homelab")
@@ -35,7 +35,10 @@ PlasmoidItem {
     switchWidth: -1
     switchHeight: -1
 
-    Theme { id: themeImpl }
+    // Route the user's theming choices into the Theme singleton so every
+    // component recolors at once (color → monochrome + accent swatch).
+    Binding { target: Theme; property: "monochrome"; value: Plasmoid.configuration.monochrome }
+    Binding { target: Theme; property: "accentChoice"; value: Plasmoid.configuration.monoAccent }
 
     CasaOSClient {
         id: apiImpl
@@ -97,13 +100,11 @@ PlasmoidItem {
 
     compactRepresentation: CompactRepresentation {
         api: root.api
-        theme: root.theme
         plasmoidItem: root
     }
 
     fullRepresentation: FullRepresentation {
         api: root.api
-        theme: root.theme
         plasmoidItem: root
     }
 }

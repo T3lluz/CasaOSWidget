@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
@@ -8,14 +9,15 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.components as PC3
 import org.kde.kirigami as Kirigami
 
-// Minimal, modern, data-rich popup. Dark surface, soft cards, vivid
-// accents per metric. All API actions (refresh / open / reboot) live in
-// the header so the user can act without scrolling.
+// Minimal, modern, data-rich popup styled to the Power-Deck app pack.
+// No opaque background of our own — we sit on the Plasma popup's
+// `backgroundColor` and layer translucent text-tinted cards on top, so
+// the look follows the user's color scheme (THEME_GUIDE §2). All colors,
+// type and motion route through the `Theme` singleton + `Kirigami.*`.
 PlasmaExtras.Representation {
     id: root
 
     required property var api
-    required property var theme
     required property var plasmoidItem
 
     collapseMarginsHint: true
@@ -36,11 +38,11 @@ PlasmaExtras.Representation {
     implicitWidth: popupWidth
 
     // --- background ------------------------------------------------------
-    Rectangle {
-        anchors.fill: parent
-        color: root.theme.bg
-        radius: root.theme.radiusMd
-    }
+    // Intentionally NO background element. We let the Plasma popup style
+    // provide its own translucent, blurred dialog background (same as
+    // Power-Deck, THEME_GUIDE §2) and only layer faint text-tinted cards
+    // on top. Painting an opaque Rectangle here would defeat the blur and
+    // make the popup look flat/solid instead of matching the Plasma theme.
 
     // --- restart confirmation -------------------------------------------
     Kirigami.PromptDialog {
@@ -82,9 +84,9 @@ PlasmaExtras.Representation {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottomMargin: Kirigami.Units.largeSpacing
         z: 99
-        radius: root.theme.radiusMd
-        color: root.theme.bgElevated
-        border.color: root.theme.cardBorder
+        radius: Kirigami.Units.smallSpacing * 1.5
+        color: Kirigami.Theme.backgroundColor
+        border.color: Theme.alpha(toast.success ? Theme.green : Theme.red, 0.45)
         border.width: 1
         opacity: 0
         visible: opacity > 0
@@ -98,13 +100,13 @@ PlasmaExtras.Representation {
             id: toastLabel
             anchors.centerIn: parent
             text: (toast.success ? "✓  " : "✗  ") + toast.message
-            color: toast.success ? root.theme.success : root.theme.danger
+            color: toast.success ? Theme.green : Theme.red
             font.weight: Font.DemiBold
             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
             renderType: Text.NativeRendering
         }
 
-        Behavior on opacity { NumberAnimation { duration: 250 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.durMed } }
     }
     Timer {
         id: toastHide
@@ -122,33 +124,66 @@ PlasmaExtras.Representation {
     }
 
     // --- shared building blocks -----------------------------------------
+    // The single most important primitive (THEME_GUIDE §2): a faint
+    // text-tinted card that reads as "lifted" on any color scheme.
     component SectionCard: Rectangle {
         id: cardRoot
         default property alias content: inner.data
         property string title: ""
+        // §5e section header: a recolored glyph badge + uppercase title and
+        // an optional right-aligned value chip.
+        property string iconKind: ""
+        property color glyphColor: Theme.iconHeader
+        property string trailingText: ""
+        property color trailingColor: Theme.success
 
         Layout.fillWidth: true
-        implicitHeight: cardLayout.implicitHeight + Kirigami.Units.smallSpacing * 2
-        radius: root.theme.radiusMd
-        color: root.theme.bgElevated
+        implicitHeight: cardLayout.implicitHeight + Kirigami.Units.largeSpacing * 2
+        radius: Kirigami.Units.smallSpacing * 1.5
+        color: Theme.alpha(Kirigami.Theme.textColor, 0.045)
         border.width: 1
-        border.color: root.theme.cardBorder
+        border.color: Theme.alpha(Kirigami.Theme.textColor, 0.08)
 
         ColumnLayout {
             id: cardLayout
             anchors.fill: parent
-            anchors.margins: Kirigami.Units.smallSpacing * 1.5
+            anchors.margins: Kirigami.Units.largeSpacing
             spacing: Kirigami.Units.smallSpacing
 
-            Text {
+            RowLayout {
                 visible: cardRoot.title.length > 0
-                text: cardRoot.title.toUpperCase()
-                color: root.theme.textDim
-                font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
-                font.weight: Font.DemiBold
-                font.letterSpacing: 0.8
-                renderType: Text.NativeRendering
+                Layout.fillWidth: true
                 Layout.bottomMargin: 2
+                spacing: Kirigami.Units.smallSpacing * 1.5
+
+                MetricIcon {
+                    visible: cardRoot.iconKind.length > 0
+                    kind: cardRoot.iconKind
+                    color: cardRoot.glyphColor
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.preferredWidth: Math.round(Kirigami.Units.gridUnit * 1.1)
+                    Layout.preferredHeight: Layout.preferredWidth
+                }
+
+                Text {
+                    text: cardRoot.title.toUpperCase()
+                    color: Kirigami.Theme.textColor
+                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 1.6
+                    renderType: Text.NativeRendering
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    visible: cardRoot.trailingText.length > 0
+                    text: cardRoot.trailingText
+                    color: cardRoot.trailingColor
+                    font.weight: Font.Bold
+                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                    renderType: Text.NativeRendering
+                }
             }
 
             ColumnLayout {
@@ -170,14 +205,14 @@ PlasmaExtras.Representation {
 
         Text {
             text: kv.label
-            color: root.theme.textDim
+            color: Kirigami.Theme.disabledTextColor
             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
             renderType: Text.NativeRendering
         }
         Item { Layout.fillWidth: true }
         Text {
             text: kv.value.length ? kv.value : "—"
-            color: kv.valueColor.length ? kv.valueColor : root.theme.text
+            color: kv.valueColor.length ? kv.valueColor : Kirigami.Theme.textColor
             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
             font.weight: Font.DemiBold
             elide: Text.ElideRight
@@ -192,7 +227,7 @@ PlasmaExtras.Representation {
     component LabeledGraph: ColumnLayout {
         id: lg
         property string label: ""
-        property color accent: root.theme.text
+        property color accent: Kirigami.Theme.textColor
         property string valueText: ""
         property alias samples: lgSpark.samples
         property bool autoScale: false
@@ -217,7 +252,7 @@ PlasmaExtras.Representation {
             Item { Layout.fillWidth: true }
             Text {
                 text: lg.valueText
-                color: root.theme.text
+                color: Kirigami.Theme.textColor
                 font.weight: Font.Bold
                 font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                 renderType: Text.NativeRendering
@@ -227,10 +262,10 @@ PlasmaExtras.Representation {
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: lg.chartHeight
-            radius: root.theme.radiusSm
-            color: root.theme.bg
+            radius: Kirigami.Units.smallSpacing * 1.25
+            color: Theme.alpha(Kirigami.Theme.textColor, 0.05)
             border.width: 1
-            border.color: root.theme.divider
+            border.color: Theme.alpha(Kirigami.Theme.textColor, 0.08)
             clip: true
 
             SparklineChart {
@@ -238,8 +273,8 @@ PlasmaExtras.Representation {
                 anchors.fill: parent
                 anchors.margins: Kirigami.Units.smallSpacing
                 lineColor: lg.accent
-                gridColor: root.theme.divider
-                baselineColor: root.theme.trackBg
+                gridColor: Theme.alpha(Kirigami.Theme.textColor, 0.08)
+                baselineColor: Theme.alpha(Kirigami.Theme.textColor, 0.12)
                 autoScale: lg.autoScale
             }
         }
@@ -249,24 +284,26 @@ PlasmaExtras.Representation {
         id: hb
         required property string kind
         property string tip: ""
-        property color accent: root.theme.text
+        property color accent: Kirigami.Theme.textColor
         signal clicked()
 
         Layout.preferredWidth: Kirigami.Units.iconSizes.medium + 6
         Layout.preferredHeight: Kirigami.Units.iconSizes.medium + 6
-        radius: root.theme.radiusSm
-        color: hbArea.containsMouse ? root.theme.bgHover : "transparent"
+        radius: Kirigami.Units.smallSpacing * 1.25
+        color: hbArea.containsMouse ? Theme.alpha(Kirigami.Theme.textColor, 0.07) : "transparent"
         border.width: 1
-        border.color: hbArea.containsMouse ? root.theme.cardBorder : "transparent"
+        border.color: hbArea.containsMouse ? Theme.alpha(Kirigami.Theme.textColor, 0.12) : "transparent"
+        scale: hbArea.pressed ? 0.94 : 1.0
 
-        Behavior on color { ColorAnimation { duration: 120 } }
+        Behavior on color { ColorAnimation { duration: Theme.durFast; easing.type: Theme.easeOut } }
+        Behavior on scale { NumberAnimation { duration: Theme.durFast; easing.type: Theme.easeOut } }
 
         MetricIcon {
             anchors.centerIn: parent
             width: Kirigami.Units.iconSizes.small
             height: width
             kind: hb.kind
-            color: hbArea.containsMouse ? hb.accent : root.theme.textDim
+            color: hbArea.containsMouse ? hb.accent : Kirigami.Theme.disabledTextColor
         }
 
         MouseArea {
@@ -291,7 +328,7 @@ PlasmaExtras.Representation {
         ColumnLayout {
             id: body
             width: parent.width
-            spacing: Kirigami.Units.smallSpacing
+            spacing: Kirigami.Units.smallSpacing * 1.5
 
             // ---- header ---------------------------------------------
             Rectangle {
@@ -299,16 +336,16 @@ PlasmaExtras.Representation {
                 Layout.leftMargin: root.edgeMargin
                 Layout.rightMargin: root.edgeMargin
                 Layout.topMargin: root.edgeMargin
-                implicitHeight: headerRow.implicitHeight + Kirigami.Units.smallSpacing * 2
-                radius: root.theme.radiusMd
-                color: root.theme.bgElevated
+                implicitHeight: headerRow.implicitHeight + Kirigami.Units.largeSpacing * 2
+                radius: Kirigami.Units.smallSpacing * 1.5
+                color: Theme.alpha(Kirigami.Theme.textColor, 0.045)
                 border.width: 1
-                border.color: root.theme.cardBorder
+                border.color: Theme.alpha(Kirigami.Theme.textColor, 0.08)
 
                 RowLayout {
                     id: headerRow
                     anchors.fill: parent
-                    anchors.margins: Kirigami.Units.smallSpacing * 1.5
+                    anchors.margins: Kirigami.Units.largeSpacing
                     spacing: Kirigami.Units.smallSpacing * 1.5
 
                     // server avatar with status ring
@@ -319,17 +356,18 @@ PlasmaExtras.Representation {
                         Rectangle {
                             anchors.fill: parent
                             radius: width / 2
-                            color: root.theme.bgHover
+                            color: Theme.alpha(Kirigami.Theme.textColor, 0.07)
                             border.width: 2
-                            border.color: root.api.isConnected ? root.theme.success
-                                : (root.api.status === "connecting" ? root.theme.warning : root.theme.danger)
+                            border.color: root.api.isConnected ? Theme.success
+                                : (root.api.status === "connecting" ? Theme.warning : Theme.danger)
+                            Behavior on border.color { ColorAnimation { duration: Theme.durMed; easing.type: Theme.easeOut } }
                         }
                         MetricIcon {
                             anchors.centerIn: parent
                             width: Kirigami.Units.iconSizes.medium
                             height: width
                             kind: "server"
-                            color: root.theme.text
+                            color: Kirigami.Theme.textColor
                         }
                     }
 
@@ -337,11 +375,23 @@ PlasmaExtras.Representation {
                         Layout.fillWidth: true
                         spacing: 2
 
+                        // eyebrow wordmark — ties the pack together
+                        Text {
+                            text: i18n("CASAOS")
+                            color: Theme.muted
+                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
+                            font.weight: Font.DemiBold
+                            font.letterSpacing: 2.2
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                            renderType: Text.NativeRendering
+                        }
+
                         Text {
                             text: Plasmoid.configuration.serverName || i18n("CasaOS Homelab")
-                            color: root.theme.text
+                            color: Kirigami.Theme.textColor
                             font.weight: Font.Bold
-                            font.pixelSize: Kirigami.Theme.defaultFont.pixelSize + 3
+                            font.pixelSize: Math.round(Kirigami.Theme.defaultFont.pixelSize * 1.25)
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                             renderType: Text.NativeRendering
@@ -351,9 +401,10 @@ PlasmaExtras.Representation {
                             spacing: Kirigami.Units.smallSpacing
                             Rectangle {
                                 width: 6; height: 6; radius: 3
-                                color: root.api.isConnected ? root.theme.success
-                                    : (root.api.status === "connecting" ? root.theme.warning : root.theme.danger)
+                                color: root.api.isConnected ? Theme.success
+                                    : (root.api.status === "connecting" ? Theme.warning : Theme.danger)
                                 Layout.alignment: Qt.AlignVCenter
+                                Behavior on color { ColorAnimation { duration: Theme.durMed; easing.type: Theme.easeOut } }
                             }
                             Text {
                                 text: root.api.isConnected
@@ -361,8 +412,8 @@ PlasmaExtras.Representation {
                                     : (root.api.status === "connecting"
                                         ? i18n("Connecting…")
                                         : (root.api.statusMessage || i18n("Disconnected")))
-                                color: root.api.isConnected ? root.theme.success
-                                    : (root.api.status === "connecting" ? root.theme.warning : root.theme.danger)
+                                color: root.api.isConnected ? Theme.success
+                                    : (root.api.status === "connecting" ? Theme.warning : Theme.danger)
                                 font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                 font.weight: Font.DemiBold
                                 renderType: Text.NativeRendering
@@ -374,7 +425,8 @@ PlasmaExtras.Representation {
                         Text {
                             visible: root.api.lastUpdateMs > 0
                             text: i18n("Updated %1", Qt.formatTime(new Date(root.api.lastUpdateMs), "HH:mm:ss"))
-                            color: root.theme.textMuted
+                            color: Theme.muted
+                            opacity: 0.7
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
                             renderType: Text.NativeRendering
                         }
@@ -383,17 +435,19 @@ PlasmaExtras.Representation {
                     HeaderButton {
                         kind: "refresh"
                         tip: i18n("Refresh now")
+                        accent: Theme.iconRefresh
                         onClicked: root.api.refresh()
                     }
                     HeaderButton {
                         kind: "dashboard"
                         tip: i18n("Open CasaOS dashboard")
+                        accent: Theme.accent
                         onClicked: root.plasmoidItem.openDashboard()
                     }
                     HeaderButton {
                         kind: "reboot"
                         tip: i18n("Reboot server")
-                        accent: root.theme.danger
+                        accent: Theme.danger
                         onClicked: root.triggerReboot()
                     }
                 }
@@ -407,10 +461,9 @@ PlasmaExtras.Representation {
                 spacing: Kirigami.Units.smallSpacing
 
                 GaugeRing {
-                    theme: root.theme
                     label: i18n("CPU")
                     percent: root.api.cpuPercent
-                    accentColor: root.theme.cpu
+                    accentColor: Theme.cpu
                     subText: root.api.cpuTemp > 0
                         ? i18n("%1 · %2 cores", root.api.formatTemp(root.api.cpuTemp), root.api.cpuCores)
                         : (root.api.cpuCores > 0 ? i18n("%1 cores", root.api.cpuCores) : "")
@@ -418,10 +471,9 @@ PlasmaExtras.Representation {
                 }
 
                 GaugeRing {
-                    theme: root.theme
                     label: i18n("RAM")
                     percent: root.api.memPercent
-                    accentColor: root.theme.ram
+                    accentColor: Theme.ram
                     centerText: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
                     subText: root.api.memTotal > 0
                         ? root.api.formatBytesShort(root.api.memUsed) + "/" + root.api.formatBytesShort(root.api.memTotal)
@@ -430,10 +482,9 @@ PlasmaExtras.Representation {
                 }
 
                 GaugeRing {
-                    theme: root.theme
                     label: i18n("DISK")
                     percent: root.api.diskPercent
-                    accentColor: root.api.diskHealthy ? root.theme.disk : root.theme.danger
+                    accentColor: root.api.diskHealthy ? Theme.disk : Theme.danger
                     centerText: root.api.diskPairText()
                     subText: root.api.diskHealthy
                         ? (root.api.diskTotal > 0
@@ -449,6 +500,8 @@ PlasmaExtras.Representation {
                 Layout.leftMargin: root.edgeMargin
                 Layout.rightMargin: root.edgeMargin
                 title: i18n("History")
+                iconKind: "chart"
+                glyphColor: Theme.iconRefresh
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -456,14 +509,14 @@ PlasmaExtras.Representation {
 
                     LabeledGraph {
                         label: i18n("CPU")
-                        accent: root.theme.cpu
+                        accent: Theme.cpu
                         valueText: root.api.cpuPercent >= 0 ? Math.round(root.api.cpuPercent) + "%" : "—"
                         samples: root.api.cpuHistory
                     }
 
                     LabeledGraph {
                         label: i18n("RAM")
-                        accent: root.theme.ram
+                        accent: Theme.ram
                         valueText: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
                         samples: root.api.memHistory
                     }
@@ -476,6 +529,8 @@ PlasmaExtras.Representation {
                 Layout.rightMargin: root.edgeMargin
                 visible: root.api.networkInterfaces.length > 0
                 title: i18n("Network")
+                iconKind: "network"
+                glyphColor: Theme.iconKbd
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -483,7 +538,7 @@ PlasmaExtras.Representation {
 
                     LabeledGraph {
                         label: "↓  " + i18n("Down")
-                        accent: root.theme.netRx
+                        accent: Theme.netRx
                         valueText: root.api.formatRate(root.api.netRxRate)
                         samples: root.api.netRxHistory
                         autoScale: true
@@ -491,7 +546,7 @@ PlasmaExtras.Representation {
 
                     LabeledGraph {
                         label: "↑  " + i18n("Up")
-                        accent: root.theme.netTx
+                        accent: Theme.netTx
                         valueText: root.api.formatRate(root.api.netTxRate)
                         samples: root.api.netTxHistory
                         autoScale: true
@@ -509,11 +564,11 @@ PlasmaExtras.Representation {
                             Layout.preferredWidth: 8
                             Layout.preferredHeight: 8
                             radius: 4
-                            color: modelData.state === "up" ? root.theme.success : root.theme.textMuted
+                            color: modelData.state === "up" ? Theme.success : Theme.muted
                         }
                         Text {
                             text: modelData.name
-                            color: root.theme.text
+                            color: Kirigami.Theme.textColor
                             font.weight: Font.DemiBold
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                             Layout.preferredWidth: Kirigami.Units.gridUnit * 5
@@ -524,7 +579,7 @@ PlasmaExtras.Representation {
                             text: i18n("↓ %1  ↑ %2",
                                        root.api.formatBytes(modelData.bytesRecv || modelData.bytes_recv || 0),
                                        root.api.formatBytes(modelData.bytesSent || modelData.bytes_sent || 0))
-                            color: root.theme.textDim
+                            color: Kirigami.Theme.disabledTextColor
                             font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
                             renderType: Text.NativeRendering
                         }
@@ -537,30 +592,14 @@ PlasmaExtras.Representation {
                 Layout.leftMargin: root.edgeMargin
                 Layout.rightMargin: root.edgeMargin
                 visible: root.api.appsTotalCount > 0
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Text {
-                        text: i18n("INSTALLED APPS")
-                        color: root.theme.textDim
-                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
-                        font.weight: Font.DemiBold
-                        font.letterSpacing: 0.8
-                        renderType: Text.NativeRendering
-                    }
-                    Item { Layout.fillWidth: true }
-                    Text {
-                        text: i18n("%1 / %2 running",
+                title: i18n("Installed Apps")
+                iconKind: "dashboard"
+                glyphColor: Theme.iconGraphics
+                trailingText: i18n("%1 / %2 running",
                                    root.api.appsRunningCount,
                                    root.api.appsTotalCount)
-                        color: root.api.appsRunningCount === root.api.appsTotalCount
-                            ? root.theme.success : root.theme.warning
-                        font.weight: Font.Bold
-                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                        renderType: Text.NativeRendering
-                    }
-                }
+                trailingColor: root.api.appsRunningCount === root.api.appsTotalCount
+                    ? Theme.success : Theme.warning
 
                 Flow {
                     Layout.fillWidth: true
@@ -574,21 +613,30 @@ PlasmaExtras.Representation {
                             required property var modelData
 
                             readonly property color statusColor: appTile.modelData.running
-                                ? root.theme.success : root.theme.danger
-                            readonly property string iconUrl: root.api.resolveAppIcon(appTile.modelData.icon)
+                                ? Theme.success : Theme.danger
+                            // Ordered icon candidates (CasaOS → dashboard-icons
+                            // by title → by name); iconIdx advances on load error.
+                            readonly property var iconUrls: root.api.appIconUrls(
+                                appTile.modelData.name,
+                                appTile.modelData.title,
+                                appTile.modelData.icon)
+                            property int iconIdx: 0
 
                             implicitWidth: Kirigami.Units.gridUnit * 4.5
                             implicitHeight: Kirigami.Units.gridUnit * 4.5
 
-                            radius: root.theme.radiusSm
+                            radius: Kirigami.Units.smallSpacing * 1.25
                             color: appTileArea.containsMouse
-                                ? root.theme.bgHover : root.theme.alpha(root.theme.bgHover, 0.5)
+                                ? Theme.alpha(Kirigami.Theme.textColor, 0.07)
+                                : Theme.alpha(Kirigami.Theme.textColor, 0.035)
                             border.width: 1
-                            border.color: root.theme.alpha(appTile.statusColor,
+                            border.color: Theme.alpha(appTile.statusColor,
                                 appTileArea.containsMouse ? 0.55 : 0.28)
+                            scale: appTileArea.pressed ? 0.97 : 1.0
 
-                            Behavior on border.color { ColorAnimation { duration: 120 } }
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            Behavior on border.color { ColorAnimation { duration: Theme.durFast; easing.type: Theme.easeOut } }
+                            Behavior on color { ColorAnimation { duration: Theme.durFast; easing.type: Theme.easeOut } }
+                            Behavior on scale { NumberAnimation { duration: Theme.durFast; easing.type: Theme.easeOut } }
 
                             ColumnLayout {
                                 anchors.fill: parent
@@ -604,7 +652,7 @@ PlasmaExtras.Representation {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: width / 2
-                                        color: root.theme.alpha(appTile.statusColor, 0.18)
+                                        color: Theme.alpha(appTile.statusColor, 0.18)
                                         visible: appIcon.status !== Image.Ready
 
                                         Text {
@@ -622,15 +670,46 @@ PlasmaExtras.Representation {
                                     Image {
                                         id: appIcon
                                         anchors.fill: parent
-                                        source: appTile.iconUrl
+                                        source: appTile.iconUrls.length > appTile.iconIdx
+                                            ? appTile.iconUrls[appTile.iconIdx] : ""
                                         smooth: true
                                         mipmap: true
                                         asynchronous: true
                                         fillMode: Image.PreserveAspectFit
                                         cache: true
-                                        visible: status === Image.Ready
+                                        // hide the colored original in monochrome —
+                                        // the themed MultiEffect below stands in for it
+                                        visible: status === Image.Ready && !Theme.monochrome
                                         sourceSize.width: Kirigami.Units.iconSizes.medium * 2
                                         sourceSize.height: Kirigami.Units.iconSizes.medium * 2
+
+                                        // Walk to the next candidate URL on failure.
+                                        onStatusChanged: {
+                                            if (status === Image.Error
+                                                && appTile.iconIdx < appTile.iconUrls.length - 1) {
+                                                appTile.iconIdx++
+                                            }
+                                        }
+                                    }
+
+                                    // Monochrome theming: keep the whole logo with
+                                    // its detail, but desaturate and tint it into the
+                                    // selected accent (luminance preserved, so it
+                                    // still reads as the real icon) and make it a
+                                    // little translucent so it sits softly in the
+                                    // grayscale theme. Color mode hides this and shows
+                                    // the full-color logo.
+                                    MultiEffect {
+                                        anchors.fill: appIcon
+                                        source: appIcon
+                                        visible: Theme.monochrome && appIcon.status === Image.Ready
+                                        opacity: 0.85
+                                        // colorization alone maps the logo onto the
+                                        // accent hue (luminance preserved, so detail
+                                        // stays). NOTE: do not add saturation:-1 here —
+                                        // it desaturates the tint back to gray.
+                                        colorization: 1.0
+                                        colorizationColor: Theme.monoSel
                                     }
                                 }
 
@@ -638,7 +717,7 @@ PlasmaExtras.Representation {
                                     Layout.fillWidth: true
                                     Layout.topMargin: 2
                                     text: appTile.modelData.title
-                                    color: root.theme.text
+                                    color: Kirigami.Theme.textColor
                                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
                                     font.weight: Font.DemiBold
                                     horizontalAlignment: Text.AlignHCenter
@@ -659,7 +738,7 @@ PlasmaExtras.Representation {
                                 anchors.topMargin: 5
                                 anchors.rightMargin: 5
                                 color: appTile.statusColor
-                                border.color: root.theme.bgElevated
+                                border.color: Kirigami.Theme.backgroundColor
                                 border.width: 2
 
                                 // soft halo so the status reads at a glance
@@ -669,7 +748,7 @@ PlasmaExtras.Representation {
                                     height: width
                                     radius: width / 2
                                     z: -1
-                                    color: root.theme.alpha(appTile.statusColor, 0.25)
+                                    color: Theme.alpha(appTile.statusColor, 0.25)
                                 }
                             }
 
@@ -698,6 +777,8 @@ PlasmaExtras.Representation {
                 Layout.rightMargin: root.edgeMargin
                 Layout.bottomMargin: root.edgeMargin
                 title: i18n("System")
+                iconKind: "server"
+                glyphColor: Theme.iconHeader
 
                 KeyValueRow {
                     label: i18n("Server")
@@ -785,7 +866,7 @@ PlasmaExtras.Representation {
                     label: i18n("Storage")
                     value: root.api.formatBytes(root.api.diskTotal)
                         + (root.api.diskHealthy ? "" : " · " + i18n("health warning"))
-                    valueColor: root.api.diskHealthy ? "" : root.theme.warning
+                    valueColor: root.api.diskHealthy ? "" : Theme.warning
                 }
                 KeyValueRow {
                     visible: root.api.processCount > 0

@@ -29,6 +29,10 @@ KCM.SimpleKCM {
     property string cfg_netUnit
     property alias cfg_historyLength: historySpin.value
 
+    // ---- theming ----
+    property alias cfg_monochrome: monoSwitch.checked
+    property int cfg_monoAccent
+
     // ---- behavior ----
     property string cfg_middleClickAction
     property alias cfg_skipRebootConfirm: skipRebootCheck.checked
@@ -182,6 +186,90 @@ KCM.SimpleKCM {
             stepSize: 15
             textFromValue: function(value) { return value + " samples" }
             valueFromText: function(text) { return parseInt(text) }
+        }
+
+        // ============ Theming ======================================
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: i18n("Theming")
+        }
+
+        QQC2.Switch {
+            id: monoSwitch
+            Kirigami.FormData.label: i18n("Monochrome:")
+            text: i18n("Grayscale chrome with a single accent")
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: " "
+            text: i18n("Replaces the per-metric colors with one neutral palette plus the accent you pick below. Matches the Power-Deck app pack's monochrome mode.")
+            wrapMode: Text.Wrap
+            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+            opacity: 0.7
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 22
+        }
+
+        // Circular accent swatches — colors mirror Theme.monoAccents so the
+        // selection here matches what the widget renders.
+        RowLayout {
+            Kirigami.FormData.label: i18n("Accent:")
+            spacing: Kirigami.Units.smallSpacing * 1.5
+            enabled: monoSwitch.checked
+            opacity: monoSwitch.checked ? 1.0 : 0.4
+
+            property var accentOptions: [
+                { name: i18n("White"),  base: "#e6e9ef" },
+                { name: i18n("Green"),  base: "#34d399" },
+                { name: i18n("Teal"),   base: "#2dd4bf" },
+                { name: i18n("Orange"), base: "#fb923c" },
+                { name: i18n("Red"),    base: "#f2596a" },
+                { name: i18n("Blue"),   base: "#56b6f0" },
+                { name: i18n("Purple"), base: "#a78bfa" }
+            ]
+
+            Repeater {
+                model: parent.accentOptions
+
+                delegate: Rectangle {
+                    id: swatch
+                    required property int index
+                    required property var modelData
+
+                    readonly property bool selected: root.cfg_monoAccent === index
+
+                    implicitWidth: Math.round(Kirigami.Units.gridUnit * 1.6)
+                    implicitHeight: implicitWidth
+                    radius: width / 2
+                    color: swatch.modelData.base
+                    border.width: swatch.selected ? 3 : 1
+                    border.color: swatch.selected
+                        ? Kirigami.Theme.textColor
+                        : Qt.rgba(Kirigami.Theme.textColor.r,
+                                  Kirigami.Theme.textColor.g,
+                                  Kirigami.Theme.textColor.b, 0.25)
+
+                    Behavior on border.width { NumberAnimation { duration: 120 } }
+
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        width: Math.round(parent.width * 0.55)
+                        height: width
+                        source: "checkmark"
+                        visible: swatch.selected
+                        color: "#1a1d24"
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.cfg_monoAccent = swatch.index
+                    }
+
+                    QQC2.ToolTip.visible: hover.hovered
+                    QQC2.ToolTip.text: swatch.modelData.name
+                    HoverHandler { id: hover }
+                }
+            }
         }
 
         // ============ Behavior =====================================

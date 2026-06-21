@@ -154,6 +154,60 @@ QtObject {
         return base + "/" + s
     }
 
+    // Normalize an app name/title into a dashboard-icons slug:
+    // lowercase, spaces/underscores → hyphens, strip anything else.
+    function iconSlug(s) {
+        if (!s) return ""
+        return String(s).toLowerCase().trim()
+            .replace(/\s+/g, "-")
+            .replace(/_/g, "-")
+            .replace(/[^a-z0-9-]/g, "")
+            .replace(/-+/g, "-")
+            .replace(/^-+|-+$/g, "")
+    }
+
+    // Common CasaOS app id → dashboard-icons slug aliases, for cases where
+    // the raw name doesn't match the icon repo's slug (e.g. "adguardhome").
+    readonly property var _iconAliases: ({
+        "adguard": "adguard-home",
+        "adguardhome": "adguard-home",
+        "pihole": "pi-hole",
+        "homeassistant": "home-assistant",
+        "hass": "home-assistant",
+        "nginxproxymanager": "nginx-proxy-manager",
+        "npm": "nginx-proxy-manager",
+        "uptimekuma": "uptime-kuma",
+        "bitwarden": "vaultwarden",
+        "qbit": "qbittorrent",
+        "syncthing": "syncthing",
+        "nextcloud": "nextcloud"
+    })
+
+    // Build a themeable SVG logo URL from the maintained dashboard-icons
+    // collection (served via the jsDelivr CDN). Used as a fallback when
+    // CasaOS doesn't hand us a working icon URL.
+    function dashboardIconUrl(ref) {
+        var slug = iconSlug(ref)
+        if (slug.length === 0) return ""
+        if (_iconAliases[slug] !== undefined) slug = _iconAliases[slug]
+        return "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/" + slug + ".svg"
+    }
+
+    // Ordered list of icon URLs to try for an app, best first:
+    //   1. the icon CasaOS reported (if it resolves to a URL)
+    //   2. dashboard-icons by display title
+    //   3. dashboard-icons by app name/id
+    // The UI walks this list, falling back on load errors, and shows the
+    // letter avatar only once every candidate fails.
+    function appIconUrls(name, title, rawIcon) {
+        var out = []
+        function add(u) { if (u && out.indexOf(u) < 0) out.push(u) }
+        add(resolveAppIcon(rawIcon))
+        add(dashboardIconUrl(title))
+        add(dashboardIconUrl(name))
+        return out
+    }
+
     function formatBytes(bytes) {
         if (bytes < 0 || isNaN(bytes)) {
             return "—"

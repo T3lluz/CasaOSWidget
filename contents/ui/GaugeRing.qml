@@ -7,14 +7,16 @@ import org.kde.kirigami as Kirigami
 Item {
     id: root
 
-    required property var theme
-
     property string label: ""
     property real percent: -1
     property string centerText: ""
     property string subText: ""
-    property color accentColor: theme.cpu
+    property color accentColor: Theme.cpu
     property real strokeWidth: 7
+
+    // Track color derives from the active scheme so the ring reads on any
+    // background, matching the Power-Deck app pack (THEME_GUIDE §2).
+    readonly property color trackColor: Theme.alpha(Kirigami.Theme.textColor, 0.12)
 
     implicitWidth: Kirigami.Units.gridUnit * 6
     implicitHeight: implicitWidth
@@ -27,6 +29,7 @@ Item {
     onPercentChanged: _animPercent = Math.max(0, percent)
     on_AnimPercentChanged: ring.requestPaint()
     onAccentColorChanged: ring.requestPaint()
+    onTrackColorChanged: ring.requestPaint()
 
     Canvas {
         id: ring
@@ -47,7 +50,7 @@ Item {
             ctx.lineWidth = root.strokeWidth
             ctx.lineCap = "round"
 
-            ctx.strokeStyle = root.theme.trackBg
+            ctx.strokeStyle = root.trackColor
             ctx.beginPath()
             ctx.arc(cx, cy, r, start, start + sweep)
             ctx.stroke()
@@ -80,11 +83,11 @@ Item {
         Text {
             Layout.alignment: Qt.AlignHCenter
             text: root.label
-            color: root.theme.textDim
+            color: Kirigami.Theme.disabledTextColor
             font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 1
             font.weight: Font.DemiBold
             font.capitalization: Font.AllUppercase
-            font.letterSpacing: 0.6
+            font.letterSpacing: 1.2
             renderType: Text.NativeRendering
         }
 
@@ -93,7 +96,7 @@ Item {
             Layout.alignment: Qt.AlignHCenter
             Layout.topMargin: 2
             text: root.subText
-            color: root.theme.textMuted
+            color: Theme.muted
             font.pixelSize: Kirigami.Theme.smallFont.pixelSize - 2
             horizontalAlignment: Text.AlignHCenter
             renderType: Text.NativeRendering

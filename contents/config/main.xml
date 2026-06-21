@@ -93,6 +93,22 @@
     </entry>
   </group>
 
+  <group name="Theming">
+    <!-- Neutral grayscale palette with a single chosen accent, matching
+         the Power-Deck app pack's monochrome mode. -->
+    <entry name="monochrome" type="Bool">
+      <label>Monochrome theme</label>
+      <default>false</default>
+    </entry>
+    <!-- 0=White,1=Green,2=Teal,3=Orange,4=Red,5=Blue,6=Purple -->
+    <entry name="monoAccent" type="Int">
+      <label>Monochrome accent</label>
+      <default>0</default>
+      <min>0</min>
+      <max>6</max>
+    </entry>
+  </group>
+
   <group name="Behavior">
     <!-- refresh, dashboard, reboot, none -->
     <entry name="middleClickAction" type="String">
