@@ -12,7 +12,7 @@ Item {
     property string centerText: ""
     property string subText: ""
     property color accentColor: Theme.cpu
-    property real strokeWidth: 8.5
+    property real strokeWidth: 7.5
 
     // Track color derives from the active scheme so the ring reads on any
     // background, matching the Power-Deck app pack (THEME_GUIDE §2).
@@ -22,8 +22,11 @@ Item {
     // width it is given (FullRepresentation stretches these with fillWidth):
     // the gauge then grows to fill its share of the row instead of being
     // capped at a fixed height.
-    implicitWidth: Kirigami.Units.gridUnit * 5.5
-    implicitHeight: Kirigami.Units.gridUnit * 7.5
+    implicitWidth: Kirigami.Units.gridUnit * 6.4
+    implicitHeight: Kirigami.Units.gridUnit * 6.4
+
+    onWidthChanged: ring.requestPaint()
+    onHeightChanged: ring.requestPaint()
 
     // animated percent so the arc tweens between API updates
     property real _animPercent: percent < 0 ? 0 : percent

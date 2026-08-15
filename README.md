@@ -16,13 +16,12 @@ A KDE Plasma 6 panel widget that monitors your [CasaOS](https://github.com/IceWh
 
 **Popup (click to expand)**
 
-- Header card with server avatar, status text, CasaOS version and last-update timestamp
-- Three big gauge rings for CPU, RAM and disk
-- CPU and RAM history sparklines, plus dedicated download/upload sparklines
-- Per-interface network breakdown
-- CasaOS services panel (running/stopped chips)
-- Installed apps grid with store icons and running-state dots
-- System info card — CPU (vendor · cores · temperature), architecture, memory, storage and CasaOS version. Extra fields (kernel, OS, hostname, uptime, BIOS, …) are shown automatically when your CasaOS build exposes them — the stock CasaOS API only reports architecture and CPU vendor
+- Landscape dashboard with a full-height CPU / RAM / disk gauge rail on the left
+- Header, system info, aligned activity graphs, and apps stacked on the right
+- CPU / RAM / down / up sparklines in one aligned 2×2 grid
+- Installed apps in a 3-column grid with per-app CPU / RAM
+- Extra system fields (kernel, BIOS, uptime, processes, timezone, CasaOS service health, …) appear when CasaOS exposes them
+- Installed-apps grid is height-capped: extra apps scroll inside the card so the popup stays stable
 - Three header buttons: **refresh**, **open dashboard**, **reboot server** (with confirmation)
 
 The widget is dark, minimal, and data-rich by design — the same Power-Deck-style aesthetic regardless of your active Plasma color scheme.
@@ -95,6 +94,7 @@ The widget authenticates against the CasaOS user API (`POST /v1/users/login`) an
 | `GET /v1/sys/utilization` | CPU, RAM, disk, per-interface network |
 | `GET /v1/sys/hardware/info` (falls back to `/v1/sys/hardware`) | Device model + CPU architecture |
 | `GET /v2/app_management/compose` (falls back to `/v1/apps`) | Installed apps, status and store icons |
+| `GET /v1/container/usage` (falls back to `/v1/app/usage`) | Per-container CPU and RAM, matched to installed apps |
 | `GET /v2/casaos/health/services` | Running and stopped `casaos-*` services |
 | `GET /v1/sys/version/current` | CasaOS version string |
 | `PUT /v1/sys/restart` | Reboot the server (header button) |

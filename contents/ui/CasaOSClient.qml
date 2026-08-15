@@ -29,6 +29,8 @@ QtObject {
     property int cpuTemp: -1
     property string cpuModel: ""
     property var cpuPower: ({})
+    property real cpuWatts: -1
+    property var _lastCpuPower: null
 
     property real memPercent: -1
     property double memUsed: 0
@@ -77,8 +79,11 @@ QtObject {
     property var servicesStopped: []
 
     // ---- installed apps --------------------------------------------------
-    // Each app: { name, title, status, running, icon }
+    // Each app: { name, title, status, running, icon, hints,
+    //             cpuPercent, memUsed, memPercent, containerCount }
     property var apps: []
+    // Raw /v1/container/usage rows, merged into `apps` once both arrive.
+    property var _appUsage: []
 
     // ---- history (sparklines) -------------------------------------------
     property var cpuHistory: []
@@ -95,6 +100,18 @@ QtObject {
         return n
     }
     readonly property int appsTotalCount: apps.length
+    readonly property real appsCpuTotal: {
+        var n = 0
+        for (var i = 0; i < apps.length; i++) {
+            if (apps[i].cpuPercent > 0) n += apps[i].cpuPercent
+        }
+        return n
+    }
+    readonly property double appsMemTotal: {
+        var n = 0
+        for (var i = 0; i < apps.length; i++) n += (apps[i].memUsed || 0)
+        return n
+    }
 
     // CasaOS reports the CPU only as a vendor keyword ("amd"/"intel"/"arm").
     // Present it in a recognisable form for the System card.
@@ -281,6 +298,15 @@ QtObject {
         return Math.round(celsius) + "°C"
     }
 
+    function formatCpuPercent(percent) {
+        if (percent === undefined || percent === null || percent < 0 || isNaN(percent)) {
+            return "—"
+        }
+        if (percent < 0.05) return "0%"
+        if (percent < 10) return percent.toFixed(1) + "%"
+        return Math.round(percent) + "%"
+    }
+
     function formatUptime(seconds) {
         if (!seconds || seconds <= 0) {
             return "—"
@@ -460,6 +486,28 @@ QtObject {
         return ""
     }
 
+    function _updateCpuWatts(power) {
+        if (!power || power.value === undefined || power.timestamp === undefined) {
+            return
+        }
+        var prev = _lastCpuPower
+        if (prev && prev.timestamp > 0 && power.timestamp > prev.timestamp) {
+            var dt = Number(power.timestamp) - Number(prev.timestamp)
+            var dj = Number(power.value) - Number(prev.value)
+            if (dt > 0 && isFinite(dj)) {
+                var watts = dj / 1000000 / dt
+                cpuWatts = (watts > 0 && watts < 1000) ? watts : -1
+            }
+        }
+        _lastCpuPower = { value: power.value, timestamp: power.timestamp }
+    }
+
+    function formatWatts(w) {
+        if (w === undefined || w === null || w < 0 || isNaN(w)) return ""
+        if (w < 10) return w.toFixed(1) + "W"
+        return Math.round(w) + "W"
+    }
+
     function parseUtilization(payload) {
         if (!payload || typeof payload !== "object") {
             return false
@@ -475,6 +523,7 @@ QtObject {
             cpuTemp = data.cpu.temperature !== undefined ? data.cpu.temperature : -1
             cpuModel = data.cpu.model !== undefined ? data.cpu.model : cpuModel
             cpuPower = data.cpu.power !== undefined ? data.cpu.power : {}
+            _updateCpuWatts(cpuPower)
         }
 
         if (data.mem) {
@@ -651,6 +700,64 @@ QtObject {
         return s.indexOf("running") >= 0 || s === "up" || s === "active" || s === "started"
     }
 
+    function _normAppName(s) {
+        return String(s || "").toLowerCase().trim()
+            .replace(/^\//, "")
+            .replace(/[\s_]+/g, "-")
+    }
+
+    // Service / container-name hints from a compose app entry, used to
+    // attribute Docker stats (whose titles are container names) back to
+    // the CasaOS app they belong to.
+    function _appNameHints(a) {
+        var hints = []
+        function add(s) {
+            var n = _normAppName(s)
+            if (n.length && hints.indexOf(n) < 0) hints.push(n)
+        }
+        if (!a) return hints
+        add(a.name)
+        add(a.main_app)
+        add(a.app_name)
+        add(a.id)
+        add(_appTitle(a))
+        var compose = a.compose || a.Compose
+        if (compose) {
+            add(compose.name)
+            var project = _normAppName(compose.name || a.name)
+            var svcs = compose.services
+            if (svcs && typeof svcs === "object") {
+                for (var k in svcs) {
+                    // Qualify service names with the compose project so a
+                    // generic "db"/"redis" service cannot steal another app's
+                    // stats. Bare container_name is still accepted.
+                    if (project.length) {
+                        add(project + "-" + k)
+                        add(project + "-" + k + "-1")
+                    }
+                    var svc = svcs[k]
+                    if (svc && typeof svc === "object") {
+                        add(svc.container_name)
+                        add(svc.containerName)
+                    }
+                }
+            }
+        }
+        if (a.containers && typeof a.containers === "object") {
+            for (var ck in a.containers) {
+                add(ck)
+                var c = a.containers[ck]
+                if (typeof c === "string") add(c)
+                else if (c && typeof c === "object") {
+                    add(c.name)
+                    add(c.Name)
+                    add(c.id)
+                }
+            }
+        }
+        return hints
+    }
+
     function parseApps(payload) {
         if (!payload) return false
         var data = payload.data !== undefined ? payload.data : payload
@@ -685,7 +792,12 @@ QtObject {
                 title: _appTitle(a) || name,
                 status: String(status || ""),
                 running: _appIsRunning(status),
-                icon: _appIcon(a)
+                icon: _appIcon(a),
+                hints: _appNameHints(a),
+                cpuPercent: -1,
+                memUsed: 0,
+                memPercent: -1,
+                containerCount: 0
             })
         }
         out.sort(function(x, y) {
@@ -693,7 +805,160 @@ QtObject {
             return x.title.toLowerCase() < y.title.toLowerCase() ? -1 : 1
         })
         apps = out
+        mergeAppUsage()
         return true
+    }
+
+    function _memCacheBytes(mem) {
+        if (!mem || !mem.stats) return 0
+        var s = mem.stats
+        if (s.inactive_file !== undefined) return Number(s.inactive_file) || 0
+        if (s.cache !== undefined) return Number(s.cache) || 0
+        if (s.total_inactive_file !== undefined) return Number(s.total_inactive_file) || 0
+        return 0
+    }
+
+    // Same formula CasaOS-UI uses (share of host CPU, one decimal).
+    // Falls back to Docker's precpu_stats when `previous` is missing.
+    function _cpuPercentFromStats(cur, prev) {
+        if (!cur) return 0
+        var cCpu = cur.cpu_stats
+        var pCpu = (prev && prev.cpu_stats) ? prev.cpu_stats : cur.precpu_stats
+        if (!cCpu || !pCpu || !cCpu.cpu_usage || !pCpu.cpu_usage) return 0
+        var cpuDelta = (Number(cCpu.cpu_usage.total_usage) || 0)
+            - (Number(pCpu.cpu_usage.total_usage) || 0)
+        var sysDelta = (Number(cCpu.system_cpu_usage) || 0)
+            - (Number(pCpu.system_cpu_usage) || 0) + 1
+        if (sysDelta <= 0 || cpuDelta < 0) return 0
+        var usage = Math.floor((cpuDelta / sysDelta) * 1000) / 10
+        if (isNaN(usage) || usage < 0) return 0
+        return usage
+    }
+
+    function _memUsedFromStats(cur) {
+        if (!cur || !cur.memory_stats) return 0
+        var mem = cur.memory_stats
+        if (!mem.stats) return Number(mem.usage) || 0
+        var used = (Number(mem.usage) || 0) - _memCacheBytes(mem)
+        return used > 0 ? used : 0
+    }
+
+    function _netBytesFromStats(stats, field) {
+        if (!stats || !stats.networks) return 0
+        var total = 0
+        for (var n in stats.networks) {
+            total += Number(stats.networks[n][field]) || 0
+        }
+        return total
+    }
+
+    function _netRateFromStats(cur, prev, field) {
+        if (!cur) return 0
+        var now = _netBytesFromStats(cur, field)
+        var then = _netBytesFromStats(prev, field)
+        var delta = now - then
+        return delta > 0 ? delta : 0
+    }
+
+    function _usageMatchScore(usageTitle, usageIcon, app) {
+        var u = _normAppName(usageTitle)
+        if (!u) return 0
+        var hints = app.hints && app.hints.length ? app.hints : [_normAppName(app.name)]
+        var best = 0
+        for (var i = 0; i < hints.length; i++) {
+            var k = hints[i]
+            if (!k) continue
+            if (u === k) {
+                best = Math.max(best, 100 + k.length)
+                continue
+            }
+            // compose: {project}-{service}-{n}
+            if (k.length >= 2 && u.indexOf(k + "-") === 0) {
+                best = Math.max(best, 60 + k.length)
+            }
+        }
+        if (best === 0 && app.icon && usageIcon && String(app.icon) === String(usageIcon)) {
+            best = 40
+        }
+        return best
+    }
+
+    function parseAppUsage(payload) {
+        if (!payload) return false
+        var data = payload.data !== undefined ? payload.data : payload
+        if (!Array.isArray(data)) return false
+
+        var rows = []
+        for (var i = 0; i < data.length; i++) {
+            var item = data[i]
+            if (!item || typeof item !== "object") continue
+            var cur = item.data
+            if (!cur || typeof cur !== "object") continue
+            rows.push({
+                title: item.title || "",
+                icon: item.icon || "",
+                cpuPercent: _cpuPercentFromStats(cur, item.previous),
+                memUsed: _memUsedFromStats(cur),
+                netRx: _netRateFromStats(cur, item.previous, "rx_bytes"),
+                netTx: _netRateFromStats(cur, item.previous, "tx_bytes")
+            })
+        }
+        _appUsage = rows
+        mergeAppUsage()
+        return true
+    }
+
+    function mergeAppUsage() {
+        if (!apps || apps.length === 0) return
+
+        var hasUsage = _appUsage && _appUsage.length > 0
+        var next = []
+        for (var i = 0; i < apps.length; i++) {
+            var a = apps[i]
+            next.push({
+                name: a.name,
+                title: a.title,
+                status: a.status,
+                running: a.running,
+                icon: a.icon,
+                hints: a.hints || [],
+                cpuPercent: (a.running && hasUsage) ? 0 : -1,
+                memUsed: 0,
+                memPercent: -1,
+                netRx: 0,
+                netTx: 0,
+                containerCount: 0
+            })
+        }
+
+        var usage = _appUsage || []
+        for (var u = 0; u < usage.length; u++) {
+            var row = usage[u]
+            var best = -1
+            var bestScore = 0
+            for (var ai = 0; ai < next.length; ai++) {
+                var score = _usageMatchScore(row.title, row.icon, next[ai])
+                if (score > bestScore) {
+                    bestScore = score
+                    best = ai
+                }
+            }
+            if (best < 0) continue
+            var target = next[best]
+            target.cpuPercent = Math.max(0, target.cpuPercent) + row.cpuPercent
+            target.memUsed += row.memUsed
+            target.netRx += row.netRx || 0
+            target.netTx += row.netTx || 0
+            target.containerCount++
+            next[best] = target
+        }
+
+        for (var j = 0; j < next.length; j++) {
+            if (next[j].memUsed > 0 && memTotal > 0) {
+                next[j].memPercent = (next[j].memUsed / memTotal) * 100
+            }
+        }
+        apps = next
     }
 
     // ---- public actions --------------------------------------------------
@@ -758,7 +1023,7 @@ QtObject {
         }
 
         var afterAuth = function() {
-            var pending = 4
+            var pending = 5
             var firstError = ""
 
             function doneOne(success, errMsg) {
@@ -818,6 +1083,20 @@ QtObject {
                 }
                 request("GET", "/v1/apps", null, function(ok2, http2, parsed2) {
                     if (ok2) parseApps(parsed2)
+                    doneOne(true, "")
+                })
+            })
+
+            // Per-container CPU/RAM. CasaOS-UI calls this `/v1/container/usage`;
+            // older builds used `/v1/app/usage`. Failure is non-fatal — the
+            // app list still renders without metrics.
+            request("GET", "/v1/container/usage", null, function(ok, httpStatus, parsed) {
+                if (ok && parseAppUsage(parsed)) {
+                    doneOne(true, "")
+                    return
+                }
+                request("GET", "/v1/app/usage", null, function(ok2, http2, parsed2) {
+                    if (ok2) parseAppUsage(parsed2)
                     doneOne(true, "")
                 })
             })
