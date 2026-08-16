@@ -67,6 +67,10 @@
       <label>Show connection dot</label>
       <default>true</default>
     </entry>
+    <entry name="showName" type="Bool">
+      <label>Show server name in the panel</label>
+      <default>false</default>
+    </entry>
     <entry name="showMiniBars" type="Bool">
       <label>Show inline progress bars</label>
       <default>false</default>
@@ -74,6 +78,10 @@
     <entry name="showSeparators" type="Bool">
       <label>Show dot separators between panel metrics</label>
       <default>false</default>
+    </entry>
+    <entry name="metricOrder" type="String">
+      <label>Comma-separated panel metric order</label>
+      <default>status,name,cpu,cpuTemp,ram,disk,netDown,netUp</default>
     </entry>
     <!-- Celsius / Fahrenheit -->
     <entry name="tempUnit" type="String">

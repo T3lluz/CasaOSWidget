@@ -8,9 +8,10 @@ import org.kde.kirigami as Kirigami
 // SVG mask recoloring (which is unreliable for non-theme icons and was
 // rendering our CPU icon as a solid white square).
 //
-// Supported kinds: "cpu" "ram" "disk" "down" "up"
+// Supported kinds: "cpu" "ram" "disk" "down" "up" "temp"
 //                  "server" "refresh" "dashboard" "reboot"
-//                  "chart" "network"
+//                  "chart" "network" "status" "text" "dots"
+//                  "bars" "both" "clock"
 Item {
     id: root
 
@@ -56,12 +57,19 @@ Item {
             case "disk":     drawDisk(ctx);     break
             case "down":     drawDown(ctx);     break
             case "up":       drawUp(ctx);       break
+            case "temp":     drawTemp(ctx);     break
             case "server":   drawServer(ctx);   break
             case "refresh":  drawRefresh(ctx);  break
             case "dashboard":drawDashboard(ctx);break
             case "reboot":   drawReboot(ctx);   break
             case "chart":    drawChart(ctx);    break
             case "network":  drawNetwork(ctx);  break
+            case "status":   drawStatus(ctx);   break
+            case "text":     drawText(ctx);     break
+            case "dots":     drawDots(ctx);     break
+            case "bars":     drawBars(ctx);     break
+            case "both":     drawBoth(ctx);     break
+            case "clock":    drawClock(ctx);    break
             }
         }
 
@@ -242,6 +250,80 @@ Item {
             ctx.stroke()
             ctx.beginPath()
             ctx.moveTo(12, 3.5); ctx.bezierCurveTo(18, 7, 18, 17, 12, 20.5)
+            ctx.stroke()
+        }
+
+        function drawTemp(ctx) {
+            ctx.lineWidth = 1.8
+            ctx.beginPath()
+            ctx.arc(12, 17.2, 4.2, Math.PI * 0.78, Math.PI * 0.22)
+            ctx.stroke()
+            roundRect(ctx, 9.4, 3.2, 5.2, 12.2, 2.4)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.arc(12, 17.2, 2.3, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.fillRect(11.15, 8.2, 1.7, 7.2)
+        }
+
+        function drawStatus(ctx) {
+            ctx.beginPath()
+            ctx.arc(12, 12, 7.4, 0, Math.PI * 2)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.arc(12, 12, 3.5, 0, Math.PI * 2)
+            ctx.fill()
+        }
+
+        function drawText(ctx) {
+            ctx.beginPath(); ctx.moveTo(5, 7);  ctx.lineTo(19, 7);  ctx.stroke()
+            ctx.beginPath(); ctx.moveTo(5, 12); ctx.lineTo(16, 12); ctx.stroke()
+            ctx.beginPath(); ctx.moveTo(5, 17); ctx.lineTo(13, 17); ctx.stroke()
+        }
+
+        function drawDots(ctx) {
+            for (var i = 0; i < 3; i++) {
+                ctx.beginPath()
+                ctx.arc(6 + i * 6, 12, 1.7, 0, Math.PI * 2)
+                ctx.fill()
+            }
+        }
+
+        function drawBars(ctx) {
+            roundRect(ctx, 4.5, 13, 4, 6.5, 0.8)
+            ctx.fill()
+            roundRect(ctx, 10, 7.5, 4, 12, 0.8)
+            ctx.fill()
+            roundRect(ctx, 15.5, 10, 4, 9.5, 0.8)
+            ctx.fill()
+        }
+
+        function drawBoth(ctx) {
+            roundRect(ctx, 3.5, 5.5, 7.5, 7.5, 1.4)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(13.2, 7)
+            ctx.lineTo(20.5, 7)
+            ctx.moveTo(13.2, 11)
+            ctx.lineTo(18.5, 11)
+            ctx.moveTo(3.5, 16.5)
+            ctx.lineTo(20.5, 16.5)
+            ctx.moveTo(3.5, 19.5)
+            ctx.lineTo(15, 19.5)
+            ctx.stroke()
+        }
+
+        function drawClock(ctx) {
+            ctx.beginPath()
+            ctx.arc(12, 12, 8, 0, Math.PI * 2)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(12, 12)
+            ctx.lineTo(12, 7.2)
+            ctx.stroke()
+            ctx.beginPath()
+            ctx.moveTo(12, 12)
+            ctx.lineTo(16.2, 13.6)
             ctx.stroke()
         }
     }

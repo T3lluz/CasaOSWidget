@@ -10,9 +10,10 @@ A KDE Plasma 6 panel widget that monitors your [CasaOS](https://github.com/IceWh
 **Panel (always visible, single line)**
 
 - Live connection status dot (pulses while connecting)
-- Server name, CPU %, RAM %, disk used/total, CPU temperature, network ↓/↑
+- Optional server name, CPU %, RAM %, disk used/total, CPU temperature, network ↓/↑
+- Configurable panel display — pick any mix of those metrics, then reorder them. Icons + values, values only, or icons only, with optional separators and mini bars (same layout language as Power Deck)
 - Scales to whatever width you give the widget on the panel
-- Click to open the popup, middle-click to refresh immediately
+- Click to open the popup, middle-click to refresh / open the dashboard / reboot (configurable)
 
 **Popup (click to expand)**
 
@@ -76,14 +77,16 @@ Or, from a local checkout:
 
 ## Configuration
 
-Right-click the widget → **Configure CasaOS Homelab**:
+Right-click the widget → **Configure CasaOS Homelab**. The page uses the same card / tile language as Power Deck:
 
-| Setting | Description |
-|---------|-------------|
-| **Server URL** | Gateway URL, e.g. `http://100.x.x.x` or `http://192.168.1.10`. Protocol optional. |
-| **Display name** | Label shown in the panel and popup header. |
-| **Username / Password** | Your CasaOS login. |
-| **Refresh interval** | How often to poll the API (2–120 s). |
+| Section | What it controls |
+|---------|------------------|
+| **Connection** | Server URL, display name, username, password. Protocol is optional (`http://` is added automatically). |
+| **Appearance** | Monochrome palette + accent swatch, icons+values / values / icons, °C or °F, network rate unit. |
+| **Panel items** | Tap tiles to show or hide status, name, CPU, temp, RAM, disk, and network. Reorder chips with the arrows. |
+| **Options** | Dot separators, mini bars, skip reboot confirmation. |
+| **Polling** | Refresh interval (2–120 s), request timeout, sparkline history length. |
+| **Behavior** | Middle-click action (refresh / dashboard / reboot / nothing) and the browser command used to open CasaOS. |
 
 ## How it works
 
@@ -120,12 +123,12 @@ contents/
     main.qml                  # PlasmoidItem entry point
     Theme.qml                 # Centralized colors + metrics
     CasaOSClient.qml          # API client (login, polling, restart)
-    CompactRepresentation.qml # Single-line panel view
+    CompactRepresentation.qml # Single-line panel view (reorderable metrics)
     FullRepresentation.qml    # Rich popup
     GaugeRing.qml             # Animated dial gauge
     SparklineChart.qml        # Bezier sparkline with gradient fill
     MetricIcon.qml            # Canvas-drawn metric / action icons
-    configGeneral.qml         # KCM page
+    configGeneral.qml         # KCM page (Power Deck card / tile layout)
 ```
 
 ## License

@@ -6,47 +6,57 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
 
-// Single-line panel widget.
+// Single-line panel widget, same layout language as Power Deck:
+// per-metric visibility, icons+values / values / icons, optional dots.
+// Order comes from Plasmoid.configuration.metricOrder so the config
+// page can rearrange the chips.
 //
 // Click handling mirrors KDE's DefaultCompactRepresentation.qml: we write
 // directly to `plasmoidItem.expanded` (passed in from main.qml) instead
-// of `Plasmoid.expanded`. The attached property mostly works the same,
-// but a small subset of Plasma 6 setups don't propagate the write to
-// the popup window — using the PlasmoidItem instance is the documented
-// pattern in plasma-desktop and is what every shipped applet uses.
-//
-// On top of that, a dedicated `clickLayer` MouseArea is anchored over
-// the whole widget as the last child so animating Text/Rectangle nodes
-// can never swallow the press, plus a TapHandler is registered as a
-// belt-and-braces fallback for the rare case where MouseArea events
-// don't propagate (see KDE bug 518024).
-//
-// Colors come from the `Theme` singleton (contents/ui/Theme.qml) so the
-// panel matches the popup and the rest of the Power-Deck app pack.
+// of `Plasmoid.expanded`. A dedicated clickLayer sits above the metrics
+// so Text relayout cannot swallow the press. hoverEnabled is off —
+// Plasma owns the tooltip via toolTipMainText/SubText on the applet.
 Item {
     id: root
 
     required property var api
-    required property var plasmoidItem      // PlasmoidItem instance from main.qml
+    required property var plasmoidItem
+
+    readonly property var defaultOrder: [
+        "status", "name", "cpu", "cpuTemp", "ram", "disk", "netDown", "netUp"
+    ]
+
+    readonly property var orderedIds: parseOrder(Plasmoid.configuration.metricOrder)
 
     readonly property bool isVertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
-    readonly property int displayMode: Plasmoid.configuration.displayMode  // 0 = icons+values, 1 = values only, 2 = icons only
+    readonly property int displayMode: Plasmoid.configuration.displayMode
     readonly property bool showIcons:  displayMode !== 1
     readonly property bool showValues: displayMode !== 2
-
-    // ---- separator visibility ------------------------------------------
-    // A dot separator is drawn before a metric when separators are enabled,
-    // that metric is visible, and at least one metric precedes it.
     readonly property bool sepsOn: Plasmoid.configuration.showSeparators
+
+    readonly property bool vStatus: Plasmoid.configuration.showStatusDot
+    readonly property bool vName: Plasmoid.configuration.showName
+        && root.showValues
+        && String(Plasmoid.configuration.serverName || "").length > 0
     readonly property bool vCpu:  Plasmoid.configuration.showCpu
     readonly property bool vTemp: Plasmoid.configuration.showCpuTemp && root.api.cpuTemp > 0
     readonly property bool vRam:  Plasmoid.configuration.showRam
     readonly property bool vDisk: Plasmoid.configuration.showDisk
-    readonly property bool vNet:  Plasmoid.configuration.showNetwork
+    readonly property bool vNetDown: Plasmoid.configuration.showNetwork
+    readonly property bool vNetUp: Plasmoid.configuration.showNetwork
 
-    // Panel glyph size, matched to Power-Deck: scale the icon with the
-    // panel thickness (capped at gridUnit*2) so it fills the panel the same
-    // way instead of staying at a fixed small icon size.
+    readonly property string visStamp: [
+        vStatus, vName, vCpu, vTemp, vRam, vDisk, vNetDown, vNetUp
+    ].join(",")
+
+    readonly property string dataStamp: [
+        api.status, api.isConnected, api.cpuPercent, api.cpuTemp,
+        api.memPercent, api.diskPercent, api.diskHealthy,
+        api.netRxRate, api.netTxRate, api.diskUsed, api.diskTotal,
+        showIcons, showValues, Plasmoid.configuration.tempUnit,
+        Plasmoid.configuration.netUnit, Plasmoid.configuration.serverName
+    ].join("|")
+
     readonly property int panelIconSize: Math.round(
         Math.min(isVertical ? width : height, Kirigami.Units.gridUnit * 2) * 0.92)
 
@@ -62,7 +72,111 @@ Item {
     Layout.minimumHeight: implicitHeight
     Layout.preferredHeight: implicitHeight
 
-    // ---- click handling --------------------------------------------
+    function parseOrder(raw) {
+        var known = {}
+        var out = []
+        var parts = String(raw || "").split(",")
+        for (var i = 0; i < parts.length; i++) {
+            var id = parts[i].trim()
+            if (id === "network") {
+                if (!known["netDown"]) {
+                    known["netDown"] = true
+                    out.push("netDown")
+                }
+                if (!known["netUp"]) {
+                    known["netUp"] = true
+                    out.push("netUp")
+                }
+                continue
+            }
+            if (defaultOrder.indexOf(id) !== -1 && !known[id]) {
+                known[id] = true
+                out.push(id)
+            }
+        }
+        for (var j = 0; j < defaultOrder.length; j++) {
+            if (!known[defaultOrder[j]])
+                out.push(defaultOrder[j])
+        }
+        return out
+    }
+
+    function slotVisible(id) {
+        switch (id) {
+        case "status": return vStatus
+        case "name": return vName
+        case "cpu": return vCpu
+        case "cpuTemp": return vTemp
+        case "ram": return vRam
+        case "disk": return vDisk
+        case "netDown": return vNetDown
+        case "netUp": return vNetUp
+        }
+        return false
+    }
+
+    function hasVisibleBefore(index) {
+        for (var i = 0; i < index; i++) {
+            if (slotVisible(orderedIds[i]))
+                return true
+        }
+        return false
+    }
+
+    function slotKind(id) {
+        switch (id) {
+        case "cpu": return "cpu"
+        case "cpuTemp": return "temp"
+        case "ram": return "ram"
+        case "disk": return "disk"
+        case "netDown": return "down"
+        case "netUp": return "up"
+        }
+        return "cpu"
+    }
+
+    function slotText(id, stamp) {
+        switch (id) {
+        case "cpu": return api.cpuPercent >= 0 ? Math.round(api.cpuPercent) + "%" : "—"
+        case "cpuTemp": return api.formatTemp(api.cpuTemp)
+        case "ram": return api.memPercent >= 0 ? Math.round(api.memPercent) + "%" : "—"
+        case "disk": return api.diskPairCompact()
+        case "netDown": return api.formatRate(api.netRxRate)
+        case "netUp": return api.formatRate(api.netTxRate)
+        }
+        return ""
+    }
+
+    function slotAccent(id, stamp) {
+        switch (id) {
+        case "cpu": return Theme.cpu
+        case "cpuTemp": return Theme.temp
+        case "ram": return Theme.ram
+        case "disk": return api.diskHealthy ? Theme.disk : Theme.danger
+        case "netDown": return Theme.netRx
+        case "netUp": return Theme.netTx
+        }
+        return Kirigami.Theme.textColor
+    }
+
+    function slotPercent(id, stamp) {
+        switch (id) {
+        case "cpu": return api.cpuPercent
+        case "cpuTemp": return api.cpuTemp
+        case "ram": return api.memPercent
+        case "disk": return api.diskPercent
+        }
+        return -1
+    }
+
+    function statusColor() {
+        if (api.isConnected)
+            return Theme.success
+        if (api.status === "connecting")
+            return Theme.warning
+        return Theme.danger
+    }
+
     function runMiddleAction() {
         switch (Plasmoid.configuration.middleClickAction) {
         case "dashboard":
@@ -83,172 +197,159 @@ Item {
         }
     }
 
-    // --- horizontal layout ----------------------------------------------
+    function midActionLabel() {
+        switch (Plasmoid.configuration.middleClickAction) {
+        case "dashboard": return i18n("open dashboard")
+        case "reboot":    return i18n("reboot server")
+        case "none":      return i18n("(nothing)")
+        default:          return i18n("refresh")
+        }
+    }
+
     RowLayout {
         id: horizontalRow
         visible: !root.isVertical
         anchors.centerIn: parent
         spacing: Kirigami.Units.smallSpacing * 1.5
 
-        Rectangle {
-            visible: Plasmoid.configuration.showStatusDot
-            Layout.alignment: Qt.AlignVCenter
-            width: 8; height: 8; radius: 4
-            color: root.api.isConnected ? Theme.success
-                : (root.api.status === "connecting" ? Theme.warning : Theme.danger)
+        Repeater {
+            model: root.orderedIds
 
-            SequentialAnimation on opacity {
-                running: root.api.status === "connecting"
-                loops: Animation.Infinite
-                NumberAnimation { from: 1;   to: 0.3; duration: 700 }
-                NumberAnimation { from: 0.3; to: 1;   duration: 700 }
+            delegate: RowLayout {
+                id: hSlot
+                required property int index
+                required property string modelData
+
+                spacing: Kirigami.Units.smallSpacing
+                Layout.alignment: Qt.AlignVCenter
+                visible: {
+                    var _ = root.visStamp
+                    return root.slotVisible(hSlot.modelData)
+                }
+
+                Sep {
+                    show: {
+                        var _ = root.visStamp
+                        return root.sepsOn && root.hasVisibleBefore(hSlot.index)
+                    }
+                }
+
+                Rectangle {
+                    visible: hSlot.modelData === "status"
+                    Layout.alignment: Qt.AlignVCenter
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: {
+                        var _ = root.dataStamp
+                        return root.statusColor()
+                    }
+
+                    SequentialAnimation on opacity {
+                        running: root.api.status === "connecting"
+                        loops: Animation.Infinite
+                        NumberAnimation { from: 1;   to: 0.3; duration: 700 }
+                        NumberAnimation { from: 0.3; to: 1;   duration: 700 }
+                    }
+                }
+
+                Text {
+                    visible: hSlot.modelData === "name"
+                    text: {
+                        var _ = root.dataStamp
+                        return Plasmoid.configuration.serverName
+                    }
+                    color: Kirigami.Theme.textColor
+                    font.weight: Font.DemiBold
+                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                    renderType: Text.NativeRendering
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                Metric {
+                    visible: hSlot.modelData !== "status" && hSlot.modelData !== "name"
+                    kind: root.slotKind(hSlot.modelData)
+                    valueText: root.slotText(hSlot.modelData, root.dataStamp)
+                    accent: root.slotAccent(hSlot.modelData, root.dataStamp)
+                    percent: root.slotPercent(hSlot.modelData, root.dataStamp)
+                    showIcon: root.showIcons
+                    showValue: root.showValues
+                }
             }
-        }
-
-        Metric {
-            visible: Plasmoid.configuration.showCpu
-            kind: "cpu"
-            valueText: root.api.cpuPercent >= 0 ? Math.round(root.api.cpuPercent) + "%" : "—"
-            percent: root.api.cpuPercent
-            accent: Theme.cpu
-            showIcon: root.showIcons
-            showValue: root.showValues
-        }
-
-        Sep { show: root.sepsOn && root.vTemp && root.vCpu }
-
-        Metric {
-            visible: Plasmoid.configuration.showCpuTemp && root.api.cpuTemp > 0
-            kind: "cpu"
-            valueText: root.api.formatTemp(root.api.cpuTemp)
-            accent: Theme.temp
-            showIcon: false
-            showValue: root.showValues
-        }
-
-        Sep { show: root.sepsOn && root.vRam && (root.vCpu || root.vTemp) }
-
-        Metric {
-            visible: Plasmoid.configuration.showRam
-            kind: "ram"
-            valueText: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
-            percent: root.api.memPercent
-            accent: Theme.ram
-            showIcon: root.showIcons
-            showValue: root.showValues
-        }
-
-        Sep { show: root.sepsOn && root.vDisk && (root.vCpu || root.vTemp || root.vRam) }
-
-        Metric {
-            visible: Plasmoid.configuration.showDisk
-            kind: "disk"
-            valueText: root.api.diskPairCompact()
-            percent: root.api.diskPercent
-            accent: root.api.diskHealthy ? Theme.disk : Theme.danger
-            showIcon: root.showIcons
-            showValue: root.showValues
-        }
-
-        Sep { show: root.sepsOn && root.vNet && (root.vCpu || root.vTemp || root.vRam || root.vDisk) }
-
-        Metric {
-            visible: Plasmoid.configuration.showNetwork
-            kind: "down"
-            valueText: root.api.formatRate(root.api.netRxRate)
-            accent: Theme.netRx
-            showIcon: root.showIcons
-            showValue: root.showValues
-        }
-
-        Sep { show: root.sepsOn && root.vNet }
-
-        Metric {
-            visible: Plasmoid.configuration.showNetwork
-            kind: "up"
-            valueText: root.api.formatRate(root.api.netTxRate)
-            accent: Theme.netTx
-            showIcon: root.showIcons
-            showValue: root.showValues
         }
     }
 
-    // --- vertical layout (rotated panel) --------------------------------
     ColumnLayout {
         id: verticalCol
         visible: root.isVertical
         anchors.centerIn: parent
         spacing: 3
 
-        Rectangle {
-            visible: Plasmoid.configuration.showStatusDot
-            Layout.alignment: Qt.AlignHCenter
-            width: 8; height: 8; radius: 4
-            color: root.api.isConnected ? Theme.success
-                : (root.api.status === "connecting" ? Theme.warning : Theme.danger)
-        }
-        VMetric {
-            visible: Plasmoid.configuration.showCpu
-            kind: "cpu"; accent: Theme.cpu
-            valueText: root.api.cpuPercent >= 0 ? Math.round(root.api.cpuPercent) + "%" : "—"
-            showIcon: root.showIcons; showValue: root.showValues
-        }
-        Sep { vertical: true; show: root.sepsOn && root.vTemp && root.vCpu }
-        VMetric {
-            visible: Plasmoid.configuration.showCpuTemp && root.api.cpuTemp > 0
-            kind: "cpu"; accent: Theme.temp
-            valueText: root.api.formatTemp(root.api.cpuTemp)
-            showIcon: false; showValue: root.showValues
-        }
-        Sep { vertical: true; show: root.sepsOn && root.vRam && (root.vCpu || root.vTemp) }
-        VMetric {
-            visible: Plasmoid.configuration.showRam
-            kind: "ram"; accent: Theme.ram
-            valueText: root.api.memPercent >= 0 ? Math.round(root.api.memPercent) + "%" : "—"
-            showIcon: root.showIcons; showValue: root.showValues
-        }
-        Sep { vertical: true; show: root.sepsOn && root.vDisk && (root.vCpu || root.vTemp || root.vRam) }
-        VMetric {
-            visible: Plasmoid.configuration.showDisk
-            kind: "disk"; accent: Theme.disk
-            valueText: root.api.diskPairCompact()
-            showIcon: root.showIcons; showValue: root.showValues
-        }
-        Sep { vertical: true; show: root.sepsOn && root.vNet && (root.vCpu || root.vTemp || root.vRam || root.vDisk) }
-        VMetric {
-            visible: Plasmoid.configuration.showNetwork
-            kind: "down"; accent: Theme.netRx
-            valueText: root.api.formatRate(root.api.netRxRate)
-            showIcon: root.showIcons; showValue: root.showValues
-        }
-        Sep { vertical: true; show: root.sepsOn && root.vNet }
-        VMetric {
-            visible: Plasmoid.configuration.showNetwork
-            kind: "up"; accent: Theme.netTx
-            valueText: root.api.formatRate(root.api.netTxRate)
-            showIcon: root.showIcons; showValue: root.showValues
+        Repeater {
+            model: root.orderedIds
+
+            delegate: ColumnLayout {
+                id: vSlot
+                required property int index
+                required property string modelData
+
+                spacing: 3
+                Layout.alignment: Qt.AlignHCenter
+                visible: {
+                    var _ = root.visStamp
+                    return root.slotVisible(vSlot.modelData)
+                }
+
+                Sep {
+                    vertical: true
+                    show: {
+                        var _ = root.visStamp
+                        return root.sepsOn && root.hasVisibleBefore(vSlot.index)
+                    }
+                }
+
+                Rectangle {
+                    visible: vSlot.modelData === "status"
+                    Layout.alignment: Qt.AlignHCenter
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: {
+                        var _ = root.dataStamp
+                        return root.statusColor()
+                    }
+                }
+
+                Text {
+                    visible: vSlot.modelData === "name"
+                    Layout.alignment: Qt.AlignHCenter
+                    text: {
+                        var _ = root.dataStamp
+                        return Plasmoid.configuration.serverName
+                    }
+                    color: Kirigami.Theme.textColor
+                    font.weight: Font.DemiBold
+                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                    renderType: Text.NativeRendering
+                }
+
+                VMetric {
+                    visible: vSlot.modelData !== "status" && vSlot.modelData !== "name"
+                    kind: root.slotKind(vSlot.modelData)
+                    valueText: root.slotText(vSlot.modelData, root.dataStamp)
+                    accent: root.slotAccent(vSlot.modelData, root.dataStamp)
+                    showIcon: root.showIcons
+                    showValue: root.showValues
+                }
+            }
         }
     }
 
-    // --- click overlay --------------------------------------------------
-    // Sits above the metric layouts so re-laying-out Text nodes can't
-    // swallow the press. Sampled-on-press avoids the popup-dismiss race
-    // (Plasma closes the popup on the press that precedes our click,
-    // so we toggle from the *pressed* state, not the current one).
-    //
-    // hoverEnabled is intentionally OFF: the hover tooltip is provided
-    // natively by Plasma via toolTipMainText/SubText in main.qml. Driving
-    // a PC3.ToolTip from containsMouse here made the tooltip appear under
-    // the cursor and loop show/hide, which is what flickered the cursor
-    // (see KDE plasma-workspace MR !4641). cursorShape still applies on
-    // hover without hoverEnabled.
     MouseArea {
         id: clickLayer
         anchors.fill: parent
         z: 1000
         hoverEnabled: false
-        // Right button is declined (mouse.accepted = false) so the applet
-        // context menu still opens normally via the containment.
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
 
@@ -273,22 +374,11 @@ Item {
             root.plasmoidItem.expanded = !wasExpanded
         }
         onReleased: function(mouse) {
-            if (mouse.button === Qt.RightButton) {
+            if (mouse.button === Qt.RightButton)
                 mouse.accepted = false
-            }
         }
     }
 
-    function midActionLabel() {
-        switch (Plasmoid.configuration.middleClickAction) {
-        case "dashboard": return i18n("open dashboard")
-        case "reboot":    return i18n("reboot server")
-        case "none":      return i18n("(nothing)")
-        default:          return i18n("refresh")
-        }
-    }
-
-    // ---- dot separator between metrics ---------------------------------
     component Sep: Rectangle {
         property bool show: false
         property bool vertical: false
@@ -300,7 +390,6 @@ Item {
         Layout.alignment: vertical ? Qt.AlignHCenter : Qt.AlignVCenter
     }
 
-    // ---- shared metric chip (horizontal) -------------------------------
     component Metric: RowLayout {
         id: m
         required property string kind
@@ -349,7 +438,6 @@ Item {
         }
     }
 
-    // ---- shared metric chip (vertical) ---------------------------------
     component VMetric: ColumnLayout {
         id: vm
         required property string kind
@@ -373,7 +461,7 @@ Item {
             visible: vm.showValue
             Layout.alignment: Qt.AlignHCenter
             text: vm.valueText
-            color: vm.accent
+            color: Kirigami.Theme.textColor
             font.weight: Font.DemiBold
             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
             renderType: Text.NativeRendering
