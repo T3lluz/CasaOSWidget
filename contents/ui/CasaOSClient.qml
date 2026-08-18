@@ -284,8 +284,27 @@ QtObject {
                 return Math.round(kb) + " KB/s"
             }
             default:
-                return formatBytesShort(bytesPerSec) + "/s"
+                return formatBytesRate(bytesPerSec)
         }
+    }
+
+    // Auto-scaled byte rate for the panel and popup. Uses B/s, KB/s,
+    // MB/s, GB/s (not K/s / M/s) so the unit is unambiguous.
+    function formatBytesRate(bytesPerSec) {
+        var units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"]
+        var value = bytesPerSec
+        var unit = 0
+        while (value >= 1024 && unit < units.length - 1) {
+            value /= 1024
+            unit++
+        }
+        if (unit === 0) {
+            return Math.round(value) + " " + units[unit]
+        }
+        if (value < 10) {
+            return value.toFixed(1) + " " + units[unit]
+        }
+        return Math.round(value) + " " + units[unit]
     }
 
     function formatTemp(celsius) {

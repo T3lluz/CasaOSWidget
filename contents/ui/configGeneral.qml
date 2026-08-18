@@ -546,7 +546,7 @@ KCM.SimpleKCM {
                     onPicked: root.cfg_netUnit = "kbytes"
                 }
                 ChoiceTile {
-                    label: i18n("Auto (B/K/M/G)")
+                    label: i18n("Auto (B/KB/MB/GB)")
                     kind: "network"
                     selected: root.cfg_netUnit === "auto"
                     onPicked: root.cfg_netUnit = "auto"
